@@ -18,8 +18,11 @@
 
 #define FALSE 0
 #define TRUE 1
-
-#define BUF_SIZE 256
+#define FLAG 0x7E
+#define A 0x01
+#define C 0x07
+#define BCC1 A ^ C
+#define BUF_SIZE 6
 
 volatile int STOP = FALSE;
 
@@ -91,15 +94,17 @@ int main(int argc, char *argv[])
     // Loop for input
     unsigned char buf[BUF_SIZE + 1] = {0}; // +1: Save space for the final '\0' char
 
-    while (STOP == FALSE)
-    {
-        // Returns after 5 chars have been input
-        int bytes = read(fd, buf, BUF_SIZE);
-        buf[bytes] = '\0'; // Set end of string to '\0', so we can printf
 
-        printf(":%s:%d\n", buf, bytes);
-        if (buf[0] == 'z')
-            STOP = TRUE;
+        // Returns after 5 chars have been input
+    int bytes = read(fd, buf, BUF_SIZE);
+    buf[bytes] = '\0'; // Set end of string to '\0', so we can printf
+    for(int i = 0; i < bytes-1; i++){ 
+    printf(":var = 0x%02X:%d\n", buf[i], i);
+    }
+    if(buf[0] == FLAG && buf[1] == 0x03 && buf[2] == 0x03 && buf[3] == 0x00 && buf[4]   ==  FLAG){
+        unsigned char res[BUF_SIZE + 1] = {FLAG,A,C,BCC1,FLAG,'\n'};
+        int bytes_write = write(fd,res,BUF_SIZE);
+        printf("%d bytes written\n", bytes_write);
     }
 
     // The while() cycle should be changed in order to respect the specifications
