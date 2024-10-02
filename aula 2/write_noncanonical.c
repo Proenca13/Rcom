@@ -124,27 +124,27 @@ int main(int argc, char *argv[])
         else {
            int bytes = write(fd, buf, BUF_SIZE);
            printf("%d bytes written\n", bytes);
-           if(buf[0] == FLAG && buf[1] == 0x01 && buf[2] == 0x07 && buf[3] == 0x01 ^ 0x07 && buf[4]   ==  FLAG){
+           sleep(1);
+            unsigned char bu[BUF_SIZE + 1] = {0};
+            int byt = read(fd,bu,BUF_SIZE);
+            bu[byt] = '\0';
+           if(bu[0] == FLAG && bu[1] == 0x01 && bu[2] == 0x07 && bu[3] == 0x01 ^ 0x07 && bu[4]   ==  FLAG){
+            for (int i = 0; i < byt-1; i++) {
+                    printf(":var = 0x%02X:%d\n", bu[i], i);
+             }
             alarm(0);
             alarmCount = 0;
+            alarmEnabled = FALSE;
            }
-           alarm(3);
-           alarmEnabled = TRUE;
            alarmCount--;
         }
     }
 
 
     // Wait until all bytes have been written to the serial port
-    sleep(1);
-    unsigned char bu[BUF_SIZE + 1] = {0};
     
-    int byt = read(fd,bu,BUF_SIZE);
-    bu[byt] = '\0';
     
-    for (int i = 0; i < byt-1; i++) {
-        printf(":var = 0x%02X:%d\n", bu[i], i);
-    }
+    
     
     // Restore the old port settings
     if (tcsetattr(fd, TCSANOW, &oldtio) == -1)
