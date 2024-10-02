@@ -26,7 +26,17 @@
 #define C 0x03
 #define BCC1 A^C
 
+int alarmEnabled = FALSE;
+int alarmCount = 0;
 
+// Alarm function handler
+void alarmHandler(int signal)
+{
+    alarmEnabled = FALSE;
+    alarmCount++;
+
+    printf("Alarm #%d\n", alarmCount);
+}
 volatile int STOP = FALSE;
 
 int main(int argc, char *argv[])
@@ -104,7 +114,18 @@ int main(int argc, char *argv[])
     // Test this condition by placing a '\n' in the middle of the buffer.
     // The whole buffer must be sent even with the '\n'.
     buf[5] = '\n';
-
+    while (alarmCount < 4)
+    {
+        if (alarmEnabled == FALSE)
+        {
+            alarm(3); // Set alarm to be triggered in 3s
+            alarmEnabled = TRUE;
+        }
+        else {
+           alarmCount--;
+            
+        }
+    }
     int bytes = write(fd, buf, BUF_SIZE);
     printf("%d bytes written\n", bytes);
 
