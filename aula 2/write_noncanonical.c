@@ -122,12 +122,18 @@ int main(int argc, char *argv[])
             alarmEnabled = TRUE;
         }
         else {
+           int bytes = write(fd, buf, BUF_SIZE);
+           printf("%d bytes written\n", bytes);
+           if(buf[0] == FLAG && buf[1] == 0x01 && buf[2] == 0x07 && buf[3] == 0x01 ^ 0x07 && buf[4]   ==  FLAG){
+            alarm(0);
+            alarmCount = 0;
+           }
+           alarm(3);
+           alarmEnabled = TRUE;
            alarmCount--;
-            
         }
     }
-    int bytes = write(fd, buf, BUF_SIZE);
-    printf("%d bytes written\n", bytes);
+
 
     // Wait until all bytes have been written to the serial port
     sleep(1);
