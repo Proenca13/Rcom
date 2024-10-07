@@ -125,23 +125,33 @@ int main(int argc, char *argv[])
             alarm(3); 
             alarmEnabled = TRUE;
         }
-            unsigned char bu[BUF_SIZE + 1] = {0};
-            int byt = read(fd,bu,BUF_SIZE);
-            if(byt != 0){
-                bu[byt] = '\0';
-                if(bu[0] == FLAG && bu[1] == 0x01 && bu[2] == 0x07 && bu[3] == 0x01 ^ 0x07 && bu[4]   ==  FLAG){
-                for (int i = 0; i < byt-1; i++) {
-                    printf(":var = 0x%02X:%d\n", bu[i], i);
+        int read_ = 0; 
+        unsigned char bu[BUF_SIZE + 1] = {0};
+        int pos = 0;
+        while (alarmEnabled == TRUE && read_ != TRUE){
+            int byt = read(fd,&bu[pos],1);
+            if (byt != 0) {
+                if (pos == 0 && bu[0] != FLAG) break; 
+                if (pos == 1 && bu[1] != 0x01) break; 
+                if (pos == 2 && bu[2] != 0x07) break; 
+                if (pos == 3 && bu[3] != (0x01 ^ 0x07)) break; 
+                if (pos == 4 && bu[4] == FLAG) { 
+                    read_ = 1; 
                 }
-                alarm(0);
-                alarmCount = 4;
-                alarmEnabled = FALSE;
-                break;
+                pos++;
+        }
+        if(read_){
+            for (int i = 0; i < 5 ; i++) {
+                        printf(":var = 0x%02X:%d\n", bu[i], i);
             }
+            alarm(0);
+            alarmEnabled = FALSE;
+            alarmCount = 4;
+            break;
+        }
         
     }
     }
-
 
     // Wait until all bytes have been written to the serial port
     

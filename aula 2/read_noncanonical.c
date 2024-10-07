@@ -21,7 +21,7 @@
 #define FLAG 0x7E
 #define A 0x01
 #define C 0x07
-#define BCC1 A ^ C
+#define BCC1 (A ^ C)
 #define BUF_SIZE 6
 
 volatile int STOP = FALSE;
