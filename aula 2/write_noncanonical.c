@@ -120,13 +120,11 @@ int main(int argc, char *argv[])
     {
         if (alarmEnabled == FALSE)
         {
+            int bytes = write(fd, buf, BUF_SIZE);
+            printf("%d bytes written\n", bytes);
             alarm(3); 
             alarmEnabled = TRUE;
         }
-        else {
-            int bytes = write(fd, buf, BUF_SIZE);
-            printf("%d bytes written\n", bytes);
-            sleep(3);
             unsigned char bu[BUF_SIZE + 1] = {0};
             int byt = read(fd,bu,BUF_SIZE);
             if(byt != 0){
@@ -136,11 +134,11 @@ int main(int argc, char *argv[])
                     printf(":var = 0x%02X:%d\n", bu[i], i);
                 }
                 alarm(0);
-                alarmCount = 0;
+                alarmCount = 4;
                 alarmEnabled = FALSE;
                 break;
             }
-        }
+        
     }
     }
 
