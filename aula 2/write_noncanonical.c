@@ -10,6 +10,7 @@
 #include <sys/stat.h>
 #include <termios.h>
 #include <unistd.h>
+#include <signal.h>
 
 // Baudrate settings are defined in <asm/termbits.h>, which is
 // included by <termios.h>
@@ -114,17 +115,18 @@ int main(int argc, char *argv[])
     // Test this condition by placing a '\n' in the middle of the buffer.
     // The whole buffer must be sent even with the '\n'.
     buf[5] = '\n';
+    (void)signal(SIGALRM, alarmHandler);
     while (alarmCount < 4)
     {
         if (alarmEnabled == FALSE)
         {
-            alarm(3); // Set alarm to be triggered in 3s
+            alarm(3); 
             alarmEnabled = TRUE;
         }
         else {
             int bytes = write(fd, buf, BUF_SIZE);
             printf("%d bytes written\n", bytes);
-            sleep(1);
+            sleep(3);
             unsigned char bu[BUF_SIZE + 1] = {0};
             int byt = read(fd,bu,BUF_SIZE);
             if(byt != 0){
@@ -138,7 +140,6 @@ int main(int argc, char *argv[])
                 alarmEnabled = FALSE;
                 break;
             }
-           alarmCount--;
         }
     }
     }
