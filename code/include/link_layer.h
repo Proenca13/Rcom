@@ -24,7 +24,7 @@ typedef enum
 typedef enum
 {
    START,
-   FLAG,
+   FLAG_ST,
    A,
    C,
    BCC, 
