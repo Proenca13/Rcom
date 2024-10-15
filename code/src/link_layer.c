@@ -26,10 +26,6 @@ void alarmHandler(int signal)
 
     printf("Alarm #%d\n", alarmCount);
 }
-
-////////////////////////////////////////////////
-// LLOPEN
-////////////////////////////////////////////////
 int llopen(LinkLayer connectionParameters)
 {   
     int fd = openSerialPort(connectionParameters.serialPort,connectionParameters.baudRate);
@@ -41,11 +37,11 @@ int llopen(LinkLayer connectionParameters)
     switch(connectionParameters.role){
         case(LlTx) :{
             (void)signal(SIGALRM, alarmHandler);
-            unsigned char frame[BUF_SIZE] = {FLAG,A_trans,C_SET,A_trans ^C_SET,FLAG} ;
+            unsigned char frame[5] = {FLAG,A_trans,C_SET,A_trans ^C_SET,FLAG} ;
             while (alarmCount < connectionParameters.nRetransmissions){
             if (alarmEnabled == FALSE)
             {
-                write(fd, frame, BUF_SIZE);
+                write(fd, frame, 5);
                 alarm(timeout); 
                 alarmEnabled = TRUE;
             }
@@ -73,7 +69,7 @@ int llopen(LinkLayer connectionParameters)
             }   
             }
             if(state == READ)return 1;
-    }
+        }
     }
         case (LlRx) :{
             while (state != READ){
@@ -100,8 +96,8 @@ int llopen(LinkLayer connectionParameters)
             }   
             }
             if(state ==READ){
-                unsigned char frame[BUF_SIZE] = {FLAG,A_recei,C_UA,A_recei ^C_UA,FLAG} ;
-                write(fd, frame, BUF_SIZE);
+                unsigned char frame[5] = {FLAG,A_recei,C_UA,A_recei ^C_UA,FLAG} ;
+                write(fd, frame, 5);
                 return 1;
             }
         }
