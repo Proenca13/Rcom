@@ -99,6 +99,11 @@ int llopen(LinkLayer connectionParameters)
                     }
             }   
             }
+            if(state ==READ){
+                unsigned char frame[BUF_SIZE] = {FLAG,A_recei,C_UA,A_recei ^C_UA,FLAG} ;
+                write(fd, frame, BUF_SIZE);
+                return 1;
+            }
         }
         default :
             return -1;
