@@ -17,7 +17,7 @@
 #define _POSIX_SOURCE 1 // POSIX compliant source
 
 int timeout = 0;
-int alarmEnabled = 0;
+int alarmEnabled = FALSE;
 int alarmCount = 0;
 void alarmHandler(int signal)
 {
@@ -31,19 +31,18 @@ int llopen(LinkLayer connectionParameters)
     int fd = openSerialPort(connectionParameters.serialPort,connectionParameters.baudRate);
     if(fd < 0)return -1;
     State state = START;
-    alarmCount = 0;
     timeout = connectionParameters.timeout;
+    alarmCount = 0;
     unsigned char byte;
     switch(connectionParameters.role){
         case(LlTx) :{
             (void)signal(SIGALRM, alarmHandler);
             unsigned char frame[5] = {FLAG,A_trans,C_SET,A_trans ^C_SET,FLAG} ;
-            while (alarmCount < connectionParameters.nRetransmissions){
-            if (alarmEnabled == FALSE)
-            {
+            while (alarmCount < connectionParameters.nRetransmissions ){
+            if (alarmEnabled == FALSE){
                 write(fd, frame, 5);
                 alarm(timeout); 
-                alarmEnabled = TRUE;
+                alarmEnabled =  TRUE;
             }
             while (alarmEnabled == TRUE && state != READ){
                 if (read(fd,&byte,1) > 0) {
@@ -53,12 +52,15 @@ int llopen(LinkLayer connectionParameters)
                             break;
                         case FLAG_ST:
                             if (byte == A_recei) state = A; 
+                            else if (byte != FLAG) state = START;
                             break;
                         case A:
                             if(byte == C_UA) state = C;
+                            else if (byte == FLAG) state = FLAG_ST;
                             break;
                         case C:
                             if(byte == (A_recei ^ C_UA)) state = BCC;
+                            else if (byte == FLAG) state = FLAG_ST;
                             break;        
                         case BCC:
                             if(byte == FLAG) state = READ;
@@ -70,7 +72,8 @@ int llopen(LinkLayer connectionParameters)
             }
             if(state == READ){
                 printf("Received UA frame. Connection established.\n");
-                return 1;}
+                return 1;
+            }
         }
         break;
     }
@@ -83,12 +86,15 @@ int llopen(LinkLayer connectionParameters)
                             break;
                         case FLAG_ST:
                             if (byte == A_trans) state = A; 
+                            else if (byte != FLAG) state = START;
                             break;
                         case A:
                             if(byte == C_SET) state = C;
+                            else if (byte == FLAG) state = FLAG_ST;
                             break;
                         case C:
                             if(byte == (A_trans ^ C_SET)) state = BCC;
+                            else if (byte == FLAG) state = FLAG_ST;
                             break;        
                         case BCC:
                             if(byte == FLAG) state = READ;
