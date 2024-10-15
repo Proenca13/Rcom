@@ -68,8 +68,11 @@ int llopen(LinkLayer connectionParameters)
                     }
             }   
             }
-            if(state == READ)return 1;
+            if(state == READ){
+                printf("Received UA frame. Connection established.\n");
+                return 1;}
         }
+        break;
     }
         case (LlRx) :{
             while (state != READ){
@@ -98,8 +101,10 @@ int llopen(LinkLayer connectionParameters)
             if(state ==READ){
                 unsigned char frame[5] = {FLAG,A_recei,C_UA,A_recei ^C_UA,FLAG} ;
                 write(fd, frame, 5);
+                printf("Sent UA frame. Connection established.\n");
                 return 1;
             }
+            break;
         }
         default :
             return -1;
