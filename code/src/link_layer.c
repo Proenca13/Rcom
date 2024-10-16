@@ -119,13 +119,33 @@ int llopen(LinkLayer connectionParameters)
     return -1;
 }
 
-////////////////////////////////////////////////
-// LLWRITE
-////////////////////////////////////////////////
 int llwrite(const unsigned char *buf, int bufSize)
 {
-    // TODO
-
+    int fd = openSerialPort(connectionParameters.serialPort,connectionParameters.baudRate);
+    if(fd < 0)return -1;
+    int frame_size = 6+bufSize;
+    unsigned char frame[frame_size];
+    frame[0] = FLAG;
+    frame[1] = A_trans;
+    frame[2] = C_SET;
+    frame[3] = A_trans ^C_SET;
+    memcpy(frame+4,buf, bufSize);
+    unsigned char BCC2  = buf[0];
+    for(int i = 1;i<= bufSizeize;i++){
+        BCC2 = BCC2 ^ buf[i];
+    }
+    frame[4+bufSize] = BCC2;
+    frame[5+bufSize] = FLAG;
+    alarmCount = 0;
+    while (alarmCount < connectionParameters.nRetransmissions ){
+            if (alarmEnabled == FALSE){
+                write(fd, frame, frame_size);
+                alarm(timeout); 
+                alarmEnabled =  TRUE;
+            }
+            while (alarmEnabled == TRUE){           
+            }
+        }
     return 0;
 }
 
