@@ -19,6 +19,7 @@
 int timeout = 0;
 int alarmEnabled = FALSE;
 int alarmCount = 0;
+int frame_number = 0;
 void alarmHandler(int signal)
 {
     alarmEnabled = FALSE;
@@ -57,13 +58,16 @@ int llopen(LinkLayer connectionParameters)
                         case A:
                             if(byte == C_UA) state = C;
                             else if (byte == FLAG) state = FLAG_ST;
+                            else state = START;
                             break;
                         case C:
                             if(byte == (A_recei ^ C_UA)) state = BCC;
                             else if (byte == FLAG) state = FLAG_ST;
+                            else state = START;
                             break;        
                         case BCC:
                             if(byte == FLAG) state = READ;
+                            else state = START;
                             break;  
                         default:
                             break;         
@@ -91,13 +95,16 @@ int llopen(LinkLayer connectionParameters)
                         case A:
                             if(byte == C_SET) state = C;
                             else if (byte == FLAG) state = FLAG_ST;
+                            else state = START;
                             break;
                         case C:
                             if(byte == (A_trans ^ C_SET)) state = BCC;
                             else if (byte == FLAG) state = FLAG_ST;
+                            else state = START;
                             break;        
                         case BCC:
                             if(byte == FLAG) state = READ;
+                            else state = START;
                             break;  
                         default:
                             break;         
@@ -119,7 +126,7 @@ int llopen(LinkLayer connectionParameters)
     return -1;
 }
 
-int llwrite(const unsigned char *buf, int bufSize)
+int llwrite(LinkLayer connectionParameters,const unsigned char *buf, int bufSize)
 {
     int fd = openSerialPort(connectionParameters.serialPort,connectionParameters.baudRate);
     if(fd < 0)return -1;
@@ -127,26 +134,66 @@ int llwrite(const unsigned char *buf, int bufSize)
     unsigned char frame[frame_size];
     frame[0] = FLAG;
     frame[1] = A_trans;
-    frame[2] = C_SET;
+    if(frame_number == 0)frame[2] = 0x00;
+    else frame[2] = 0x80;
     frame[3] = A_trans ^C_SET;
     memcpy(frame+4,buf, bufSize);
     unsigned char BCC2  = buf[0];
-    for(int i = 1;i<= bufSizeize;i++){
+    for(int i = 1;i<= bufSize;i++){
         BCC2 = BCC2 ^ buf[i];
     }
     frame[4+bufSize] = BCC2;
     frame[5+bufSize] = FLAG;
     alarmCount = 0;
+    int accepted = 0;
+    State state = START;
+    unsigned char C_byte;
+    unsigned char byte;
     while (alarmCount < connectionParameters.nRetransmissions ){
             if (alarmEnabled == FALSE){
                 write(fd, frame, frame_size);
                 alarm(timeout); 
                 alarmEnabled =  TRUE;
             }
-            while (alarmEnabled == TRUE){           
+            while (alarmEnabled == TRUE && state != READ){  
+                if (read(fd,&byte,1) > 0){
+                    switch(state){
+                        case START:
+                            if (byte == FLAG) state = FLAG_ST; 
+                            break;
+                        case FLAG_ST:
+                            if (byte == A_recei) state = A; 
+                            else if (byte != FLAG) state = START;
+                            break;
+                        case A:
+                            if ( byte == C_RR0 || byte == C_RR1 || byte == C_REJ0 || byte == C_REJ1 ){
+                                state = C;
+                                C_byte = byte;
+                            }
+                            else if (byte == FLAG) state = FLAG_ST;
+                            else state = START;
+                        case C:
+                            if(byte == (A_recei ^ C_byte)) state = BCC;
+                            else if (byte == FLAG) state = FLAG_ST;
+                            else state = START;
+                        case BCC:
+                            if(byte == FLAG)state = READ;
+                            else state = START;
+                        default:
+                            break;           
+                    }
+                }         
             }
+            if(state == READ){
+                if(C_byte == C_RR0 || C_byte == C_RR1){
+                    accepted = 1;
+                    frame_number = (frame_number+1)%2;
+                }
+            }
+            if(accepted)break;
         }
-    return 0;
+        if (accepted) return frame_size;
+    return -1;
 }
 
 ////////////////////////////////////////////////
