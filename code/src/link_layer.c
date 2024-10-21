@@ -196,17 +196,15 @@ int llwrite(LinkLayer connectionParameters,const unsigned char *buf, int bufSize
     return -1;
 }
 
-////////////////////////////////////////////////
-// LLREAD
-////////////////////////////////////////////////
-int llread(int fd, unsigned char *packet, int maxPacketSize) {
+
+int llread(int fd, unsigned char *packet, int packetSize) {
     State state = START;
     unsigned char byte;
     unsigned char C_byte;
     int packetIndex = 0;
     unsigned char BCC2 = 0;
     int dataIndex = 0;  
-    unsigned char tempBuffer[maxPacketSize]; 
+    unsigned char tempBuffer[packetSize]; 
 
     while (state != READ) {
         if (read(fd, &byte, 1) <= 0) {
@@ -255,7 +253,7 @@ int llread(int fd, unsigned char *packet, int maxPacketSize) {
                         return -1;  
                     }
                 } else {
-                    if (dataIndex < maxPacketSize) {
+                    if (dataIndex < packetSize) {
                         tempBuffer[dataIndex++] = byte; 
                         if (dataIndex == 1)
                             BCC2 = byte;  
@@ -267,9 +265,7 @@ int llread(int fd, unsigned char *packet, int maxPacketSize) {
                     }
                 }
                 break;
-
             default:
-                state = START;  
                 break;
         }
     }
@@ -283,10 +279,48 @@ int llread(int fd, unsigned char *packet, int maxPacketSize) {
 ////////////////////////////////////////////////
 // LLCLOSE
 ////////////////////////////////////////////////
-int llclose(int showStatistics)
+int llclose(int fd, int showStatistics)
 {
-    // TODO
+    State state = START;
+    unsigned char byte;
+    (void)signal(SIGALRM, alarmHandler);
+    while (alarmCount < connectionParameters.nRetransmissions ){
+            if (alarmEnabled == FALSE){
+                write(fd, frame, 5);
+                alarm(timeout); 
+                alarmEnabled =  TRUE;
+            }
 
+            while (alarmEnabled == TRUE && state != READ){  
+                        if (read(fd,&byte,1) > 0){
+                            switch(state){
+                                case START:
+                                    if (byte == FLAG) state = FLAG_ST; 
+                                    break;
+                                case FLAG_ST:
+                                    if (byte == A_recei) state = A; 
+                                    else if (byte != FLAG) state = START;
+                                    break;
+                                case A:
+                                    if ( byte == C_RR0 || byte == C_RR1 || byte == C_REJ0 || byte == C_REJ1 ){
+                                        state = C;
+                                        C_byte = byte;
+                                    }
+                                    else if (byte == FLAG) state = FLAG_ST;
+                                    else state = START;
+                                case C:
+                                    if(byte == (A_recei ^ C_byte)) state = BCC;
+                                    else if (byte == FLAG) state = FLAG_ST;
+                                    else state = START;
+                                case BCC:
+                                    if(byte == FLAG)state = READ;
+                                    else state = START;
+                                default:
+                                    break;           
+                            }
+                        }         
+                    }
+    }
     int clstat = closeSerialPort();
     return clstat;
 }
