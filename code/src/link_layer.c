@@ -143,8 +143,34 @@ int llwrite(LinkLayer connectionParameters,const unsigned char *buf, int bufSize
     for(int i = 1;i<= bufSize;i++){
         BCC2 = BCC2 ^ buf[i];
     }
-    frame[4 + bufSize] = BCC2;
-    frame[5 + bufSize] = FLAG;
+    int j = 4;  
+    for (unsigned int i = 0; i < bufSize; i++) {
+    if (buf[i] == FLAG || buf[i] == ESC) {
+        frame = realloc(frame, ++frameSize);
+        if (frame == NULL) {
+            perror("Memory allocation failed");
+            return -1;  
+        }
+        frame[j++] = ESC;  
+        frame[j++] = buf[i] ^ 0x20;  
+    } else {
+        frame[j++] = buf[i];  
+    }
+    }
+    if (BCC2 == FLAG || BCC2 == ESC) {
+    frame = realloc(frame, ++frameSize);
+    if (frame == NULL) {
+        perror("Memory allocation failed");
+        return -1;
+    }
+    frame[j++] = ESC;
+    frame[j++] = BCC2 ^ 0x20; 
+    } 
+    else {
+        frame[j++] = BCC2; 
+    }
+    frame[j++] = FLAG;
+
     alarmCount = 0;
     int accepted = 0;
     State state = START;
@@ -193,6 +219,7 @@ int llwrite(LinkLayer connectionParameters,const unsigned char *buf, int bufSize
             }
             if(accepted)break;
         }
+        free(frame);
         if (accepted) return frame_size;
     return -1;
 }
