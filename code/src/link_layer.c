@@ -39,7 +39,7 @@ int llopen(LinkLayer connectionParameters)
         case(LlTx) :{
             (void)signal(SIGALRM, alarmHandler);
             unsigned char frame[5] = {FLAG,A_trans,C_SET,A_trans ^C_SET,FLAG} ;
-            while (alarmCount < connectionParameters.nRetransmissions ){
+            while (alarmCount <= connectionParameters.nRetransmissions ){
             if (alarmEnabled == FALSE){
                 write(fd, frame, 5);
                 alarm(timeout); 
@@ -149,7 +149,7 @@ int llwrite(LinkLayer connectionParameters,const unsigned char *buf, int bufSize
     State state = START;
     unsigned char C_byte;
     unsigned char byte;
-    while (alarmCount < connectionParameters.nRetransmissions ){
+    while (alarmCount <= connectionParameters.nRetransmissions ){
             if (alarmEnabled == FALSE){
                 write(fd, frame, frame_size);
                 alarm(timeout); 

@@ -4,7 +4,7 @@
 #ifndef _LINK_LAYER_H_
 #define _LINK_LAYER_H_
 
-#define BUF_SIZE  256
+#define BUF_SIZE 256
 #define FLAG 0x7E
 #define A_trans 0x03 
 #define A_recei 0x01
