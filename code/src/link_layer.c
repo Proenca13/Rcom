@@ -351,3 +351,4 @@ int llclose(LinkLayer connectionParameters, int fd, int showStatistics)
     return -1;
 }
 
+int retransmissions = 0;
