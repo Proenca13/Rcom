@@ -27,6 +27,7 @@ void alarmHandler(int signal)
 
     printf("Alarm #%d\n", alarmCount);
 }
+
 int llopen(LinkLayer connectionParameters)
 {   
     int fd = openSerialPort(connectionParameters.serialPort,connectionParameters.baudRate);
@@ -39,7 +40,7 @@ int llopen(LinkLayer connectionParameters)
         case(LlTx) :{
             (void)signal(SIGALRM, alarmHandler);
             unsigned char frame[5] = {FLAG,A_trans,C_SET,A_trans ^C_SET,FLAG} ;
-            while (alarmCount <= connectionParameters.nRetransmissions ){
+            while (alarmCount <= connectionParameters.nRetransmissions){
             if (alarmEnabled == FALSE){
                 write(fd, frame, 5);
                 alarm(timeout); 
@@ -279,48 +280,74 @@ int llread(int fd, unsigned char *packet, int packetSize) {
 ////////////////////////////////////////////////
 // LLCLOSE
 ////////////////////////////////////////////////
-int llclose(int fd, int showStatistics)
+int llclose(LinkLayer connectionParameters, int fd, int showStatistics)
 {
+    // Initialize variables
     State state = START;
     unsigned char byte;
-    (void)signal(SIGALRM, alarmHandler);
-    while (alarmCount < connectionParameters.nRetransmissions ){
-            if (alarmEnabled == FALSE){
-                write(fd, frame, 5);
-                alarm(timeout); 
-                alarmEnabled =  TRUE;
+    int alarmCount = 0;
+    int alarmEnabled = FALSE;
+    
+    (void)signal(SIGALRM, alarmHandler);  // Set up the alarm handler
+    
+    // Sending DISC frame and waiting for DISC from the other end
+    while (alarmCount <= connectionParameters.nRetransmissions) {
+        if (alarmEnabled == FALSE) {
+            unsigned char discFrame[5] = {FLAG, A_trans, C_DISC, A_trans ^ C_DISC, FLAG};
+            write(fd, discFrame, 5);   // Send DISC frame
+            alarm(connectionParameters.timeout);  // Set alarm for timeout
+            alarmEnabled = TRUE;
+        }
+
+        while (alarmEnabled == TRUE && state != READ) {
+            if (read(fd, &byte, 1) > 0) {
+                switch (state) {
+                    case START:
+                        if (byte == FLAG) state = FLAG_ST;
+                        break;
+                    case FLAG_ST:
+                        if (byte == A_recei) state = A;
+                        else if (byte != FLAG) state = START;
+                        break;
+                    case A:
+                        if (byte == C_DISC) state = C;
+                        else if (byte == FLAG) state = FLAG_ST;
+                        else state = START;
+                        break;
+                    case C:
+                        if (byte == (A_recei ^ C_DISC)) state = BCC;
+                        else if (byte == FLAG) state = FLAG_ST;
+                        else state = START;
+                        break;
+                    case BCC:
+                        if (byte == FLAG) state = READ;
+                        else state = START;
+                        break;
+                    default:
+                        break;
+                }
+            }
+        }
+
+        if (state == READ) {
+            printf("Received DISC frame. Sending UA frame.\n");
+
+            unsigned char uaFrame[5] = {FLAG, A_recei, C_UA, A_recei ^ C_UA, FLAG};
+            write(fd, uaFrame, 5);
+            printf("UA frame sent. Closing connection.\n");
+
+            int closeStatus = closeSerialPort(fd);
+            if (showStatistics) {
+                printf("Connection closed successfully. Statistics displayed.\n");
             }
 
-            while (alarmEnabled == TRUE && state != READ){  
-                        if (read(fd,&byte,1) > 0){
-                            switch(state){
-                                case START:
-                                    if (byte == FLAG) state = FLAG_ST; 
-                                    break;
-                                case FLAG_ST:
-                                    if (byte == A_recei) state = A; 
-                                    else if (byte != FLAG) state = START;
-                                    break;
-                                case A:
-                                    if ( byte == C_RR0 || byte == C_RR1 || byte == C_REJ0 || byte == C_REJ1 ){
-                                        state = C;
-                                        C_byte = byte;
-                                    }
-                                    else if (byte == FLAG) state = FLAG_ST;
-                                    else state = START;
-                                case C:
-                                    if(byte == (A_recei ^ C_byte)) state = BCC;
-                                    else if (byte == FLAG) state = FLAG_ST;
-                                    else state = START;
-                                case BCC:
-                                    if(byte == FLAG)state = READ;
-                                    else state = START;
-                                default:
-                                    break;           
-                            }
-                        }         
-                    }
+            return closeStatus;  
+        }
+
+        alarmCount++;
     }
-    int clstat = closeSerialPort();
-    return clstat;
+
+    printf("Error: Failed to receive DISC after %d retransmissions.\n", connectionParameters.nRetransmissions);
+    return -1;
 }
+
