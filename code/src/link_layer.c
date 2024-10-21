@@ -202,7 +202,6 @@ int llread(int fd, unsigned char *packet, int packetSize) {
     State state = START;
     unsigned char byte;
     unsigned char C_byte;
-    int packetIndex = 0;
     unsigned char BCC2 = 0;
     int dataIndex = 0;  
     unsigned char tempBuffer[packetSize]; 
