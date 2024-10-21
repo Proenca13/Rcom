@@ -199,77 +199,85 @@ int llwrite(LinkLayer connectionParameters,const unsigned char *buf, int bufSize
 ////////////////////////////////////////////////
 // LLREAD
 ////////////////////////////////////////////////
-
-int llread(unsigned char *packet) {
+int llread(int fd, unsigned char *packet, int maxPacketSize) {
     State state = START;
     unsigned char byte;
     unsigned char C_byte;
     int packetIndex = 0;
     unsigned char BCC2 = 0;
+    int dataIndex = 0;  
+    unsigned char tempBuffer[maxPacketSize]; 
 
-    // Iterate through the packet array until the frame is fully processed
     while (state != READ) {
-        byte = packet[packetIndex++];  // Read the next byte from the packet
+        if (read(fd, &byte, 1) <= 0) {
+            continue;  
+        }
 
         switch (state) {
             case START:
                 if (byte == FLAG)
-                    state = FLAG_ST;  // Move to FLAG_ST when FLAG is received
+                    state = FLAG_ST;  
                 break;
 
             case FLAG_ST:
                 if (byte == A_trans)
-                    state = A;  // Move to A if Address (A_trans) matches
+                    state = A;  
                 else if (byte != FLAG)
-                    state = START;  // Reset to START if byte is invalid
+                    state = START;  
                 break;
 
             case A:
-                if (byte == 0x00 || byte == 0x80) {  // Expected control bytes (frame number)
+                if (byte == I_0 || byte == I_1) {  
                     C_byte = byte;
-                    state = C;  // Move to C when control byte is valid
+                    state = C;  
                 } else if (byte == FLAG)
-                    state = FLAG_ST;  // Restart from FLAG_ST if FLAG is received again
+                    state = FLAG_ST;  
                 else
-                    state = START;  // Invalid byte, reset to START
+                    state = START;  
                 break;
 
             case C:
-                if (byte == (A_trans ^ C_byte))
-                    state = BCC;  // Move to BCC if XOR of A and C is correct
+                if (byte == (A_trans ^ C_byte))  
+                    state = BCC;  
                 else if (byte == FLAG)
-                    state = FLAG_ST;  // Restart from FLAG_ST if FLAG is received
+                    state = FLAG_ST;  
                 else
-                    state = START;  // Invalid BCC, reset to START
+                    state = START;  
                 break;
 
             case BCC:
                 if (byte == FLAG) {
-                    state = READ;  // Received final FLAG, frame is valid
-                } else {
-                    if (packetIndex == 1) {
-                        BCC2 = byte;  // Initialize BCC2 with the first byte of the packet
+                    if (BCC2 == 0) {
+                        state = READ;  
+                        memcpy(packet, tempBuffer, dataIndex);  
                     } else {
-                        BCC2 ^= byte;  // XOR each subsequent byte to calculate BCC2
+                        printf("Error: BCC2 mismatch.\n");
+                        return -1;  
+                    }
+                } else {
+                    if (dataIndex < maxPacketSize) {
+                        tempBuffer[dataIndex++] = byte; 
+                        if (dataIndex == 1)
+                            BCC2 = byte;  
+                        else
+                            BCC2 ^= byte;  
+                    } else {
+                        printf("Error: Packet buffer overflow.\n");
+                        return -1;  
                     }
                 }
                 break;
 
             default:
-                state = START;  // Reset to START in case of unexpected state
+                state = START;  
                 break;
         }
     }
 
-    // Perform BCC2 check
-    if (BCC2 != 0) {
-        printf("Error: BCC2 mismatch.\n");
-        return -1;  // Return error if BCC2 check fails
-    }
-
     printf("Frame successfully received.\n");
-    return packetIndex;  // Return the number of bytes processed from the packet
+    return dataIndex;  
 }
+
 
 
 ////////////////////////////////////////////////
