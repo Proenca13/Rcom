@@ -172,11 +172,13 @@ int llwrite(LinkLayer connectionParameters,const unsigned char *buf, int bufSize
     }
     frame[j++] = FLAG;
     alarmCount = 0;
+    alarmEnabled = FALSE;
     int accepted = 0;
     State state = START;
     unsigned char C_byte;
     unsigned char byte;
     (void)signal(SIGALRM, alarmHandler);
+    timeout = connectionParameters.timeout;
     while (alarmCount <= connectionParameters.nRetransmissions ){
             if (alarmEnabled == FALSE){
                 write(fd, frame, frame_size);
@@ -332,11 +334,6 @@ int llread(LinkLayer connectionParameters,unsigned char *packet) {
     return dataIndex; 
 }
 
-
-
-////////////////////////////////////////////////
-// LLCLOSE
-////////////////////////////////////////////////
 int llclose(LinkLayer connectionParameters,int showStatistics)
 {
     int fd = openSerialPort(connectionParameters.serialPort,connectionParameters.baudRate);
@@ -344,65 +341,100 @@ int llclose(LinkLayer connectionParameters,int showStatistics)
     State state = START;
     unsigned char byte;
     alarmCount = 0;
-    int alarmEnabled = FALSE;
-    
-    (void)signal(SIGALRM, alarmHandler);  
-    
-    while (alarmCount <= connectionParameters.nRetransmissions) {
-        if (alarmEnabled == FALSE) {
-            unsigned char discFrame[5] = {FLAG, A_trans, C_DISC, A_trans ^ C_DISC, FLAG};
-            write(fd, discFrame, 5);   
-            alarm(connectionParameters.timeout);  
-            alarmEnabled = TRUE;
-        }
-
-        while (alarmEnabled == TRUE && state != READ) {
-            if (read(fd, &byte, 1) > 0) {
-                switch (state) {
-                    case START:
-                        if (byte == FLAG) state = FLAG_ST;
-                        break;
-                    case FLAG_ST:
-                        if (byte == A_recei) state = A;
-                        else if (byte != FLAG) state = START;
-                        break;
-                    case A:
-                        if (byte == C_DISC) state = C;
-                        else if (byte == FLAG) state = FLAG_ST;
-                        else state = START;
-                        break;
-                    case C:
-                        if (byte == (A_recei ^ C_DISC)) state = BCC;
-                        else if (byte == FLAG) state = FLAG_ST;
-                        else state = START;
-                        break;
-                    case BCC:
-                        if (byte == FLAG) state = READ;
-                        else state = START;
-                        break;
-                    default:
-                        break;
+    alarmEnabled = FALSE;
+    timeout = connectionParameters.timeout;
+    unsigned char discFrame[5] = {FLAG, A_trans, C_DISC, A_trans ^ C_DISC, FLAG};
+    switch(connectionParameters.role){
+        case LlTx : {
+            (void)signal(SIGALRM, alarmHandler);  
+            while (alarmCount <= connectionParameters.nRetransmissions) {
+                if (alarmEnabled == FALSE) {
+                    write(fd, discFrame, 5);   
+                    alarm(timeout);  
+                    alarmEnabled = TRUE;
                 }
+                while (alarmEnabled == TRUE && state != READ) {
+                    if (read(fd, &byte, 1) > 0) {
+                        switch (state) {
+                            case START:
+                                if (byte == FLAG) state = FLAG_ST;
+                                break;
+                            case FLAG_ST:
+                                if (byte == A_recei) state = A;
+                                else if (byte != FLAG) state = START;
+                                break;
+                            case A:
+                                if (byte == C_DISC) state = C;
+                                else if (byte == FLAG) state = FLAG_ST;
+                                else state = START;
+                                break;
+                            case C:
+                                if (byte == (A_recei ^ C_DISC)) state = BCC;
+                                else if (byte == FLAG) state = FLAG_ST;
+                                else state = START;
+                                break;
+                            case BCC:
+                                if (byte == FLAG) state = READ;
+                                else state = START;
+                                break;
+                            default:
+                                break;
+                        }
+                    }
+                }
+                if (state == READ) {
+                    printf("Received DISC frame. Sending UA frame.\n");
+                    unsigned char uaFrame[5] = {FLAG, A_recei, C_UA, A_recei ^ C_UA, FLAG};
+                    write(fd, uaFrame, 5);
+                    printf("UA frame sent. Closing connection.\n");
+                    int closeStatus = closeSerialPort(fd);
+                    if (showStatistics) {
+                        printf("Connection closed successfully. Statistics displayed.\n");
+                    }
+
+                    return closeStatus;  
+                }
+
             }
-        }
-
-        if (state == READ) {
-            printf("Received DISC frame. Sending UA frame.\n");
-
-            unsigned char uaFrame[5] = {FLAG, A_recei, C_UA, A_recei ^ C_UA, FLAG};
-            write(fd, uaFrame, 5);
-            printf("UA frame sent. Closing connection.\n");
-
-            int closeStatus = closeSerialPort(fd);
-            if (showStatistics) {
-                printf("Connection closed successfully. Statistics displayed.\n");
-            }
-
-            return closeStatus;  
-        }
-
+        break;
     }
-
+        case LlRx:{
+            while (state != READ) {
+                    if (read(fd, &byte, 1) > 0) {
+                        printf("read");
+                        switch (state) {
+                            case START:
+                                if (byte == FLAG) state = FLAG_ST;
+                                break;
+                            case FLAG_ST:
+                                if (byte == A_recei) state = A;
+                                else if (byte != FLAG) state = START;
+                                break;
+                            case A:
+                                if (byte == C_DISC) state = C;
+                                else if (byte == FLAG) state = FLAG_ST;
+                                else state = START;
+                                break;
+                            case C:
+                                if (byte == (A_recei ^ C_DISC)) state = BCC;
+                                else if (byte == FLAG) state = FLAG_ST;
+                                else state = START;
+                                break;
+                            case BCC:
+                                if (byte == FLAG) state = READ;
+                                else state = START;
+                                break;
+                            default:
+                                break;
+                        }
+                    }
+                }
+            write(fd, discFrame, 5);
+            break;
+        }
+        default:
+            break;
+    }
     printf("Error: Failed to receive DISC after %d retransmissions.\n", connectionParameters.nRetransmissions);
     return -1;
 }

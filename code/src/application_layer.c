@@ -36,10 +36,8 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
             } else {
                 printf("Message sent successfully.\n");
             }
-            llclose(linkLayer,0);
             break;
         }
-
         case LlRx: {
             printf("App layer receiver works.\n");
 
@@ -54,10 +52,15 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
             } else {
                 printf("Error reading the message or no data received\n");
             }
-
             break;
         }
         default:
             break;
     }
+    int fd1 = llclose(linkLayer,0);
+    if (fd1 < 0) {
+        perror("Close error\n");
+        exit(-1);
+    }
+    else (printf("close works\n"));
 }
