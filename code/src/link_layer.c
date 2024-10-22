@@ -135,9 +135,9 @@ int llwrite(LinkLayer connectionParameters,const unsigned char *buf, int bufSize
     unsigned char *frame = (unsigned char *)malloc(frame_size);
     frame[0] = FLAG;
     frame[1] = A_trans;
-    if(frame_number == 0)frame[2] = 0x00;
-    else frame[2] = 0x80;
-    frame[3] = A_trans ^ C_SET;
+    if(frame_number == 0)frame[2] = I_0;
+    else frame[2] = I_1;
+    frame[3] = A_trans ^ frame[2];
     memcpy(frame + 4,buf, bufSize);
     unsigned char BCC2  = buf[0];
     for(int i = 1;i<= bufSize;i++){
@@ -176,6 +176,7 @@ int llwrite(LinkLayer connectionParameters,const unsigned char *buf, int bufSize
     State state = START;
     unsigned char C_byte;
     unsigned char byte;
+    (void)signal(SIGALRM, alarmHandler);
     while (alarmCount <= connectionParameters.nRetransmissions ){
             if (alarmEnabled == FALSE){
                 write(fd, frame, frame_size);
@@ -199,13 +200,18 @@ int llwrite(LinkLayer connectionParameters,const unsigned char *buf, int bufSize
                             }
                             else if (byte == FLAG) state = FLAG_ST;
                             else state = START;
+                            break;
                         case C:
                             if(byte == (A_recei ^ C_byte)) state = BCC;
                             else if (byte == FLAG) state = FLAG_ST;
                             else state = START;
+                            break;
                         case BCC:
-                            if(byte == FLAG)state = READ;
+                            if(byte == FLAG){
+                                state = READ;
+                            }
                             else state = START;
+                            break;
                         default:
                             break;           
                     }
@@ -217,22 +223,27 @@ int llwrite(LinkLayer connectionParameters,const unsigned char *buf, int bufSize
                     frame_number = (frame_number+1)%2;
                 }
             }
-            if(accepted)break;
-        }
-        free(frame);
-        if (accepted) return frame_size;
+            if(accepted){
+                alarmCount = connectionParameters.nRetransmissions+1;
+                alarm(0);
+                alarmEnabled = FALSE;
+                break;
+
+            }
+    }
+    free(frame);
+    if (accepted) return frame_size;
     return -1;
 }
 
 
-int llread(int fd, unsigned char *packet, int packetSize) {
+int llread(LinkLayer connectionParameters,unsigned char *packet) {
+    int fd = openSerialPort(connectionParameters.serialPort,connectionParameters.baudRate);
     State state = START;
     unsigned char byte;
     unsigned char C_byte;
-    unsigned char BCC2 = 0;
     int dataIndex = 0;  
-    unsigned char tempBuffer[packetSize]; 
-
+    unsigned char c_response;
     while (state != READ) {
         if (read(fd, &byte, 1) <= 0) {
             continue;  
@@ -271,34 +282,54 @@ int llread(int fd, unsigned char *packet, int packetSize) {
                 break;
 
             case BCC:
-                if (byte == FLAG) {
-                    if (BCC2 == 0) {
-                        state = READ;  
-                        memcpy(packet, tempBuffer, dataIndex);  
-                    } else {
-                        printf("Error: BCC2 mismatch.\n");
-                        return -1;  
-                    }
+                if (byte == ESC) {
+                    state = ESC_FLAG_READ;  
+                } 
+                else if (byte == FLAG) {
+                unsigned char BCC2 = packet[dataIndex - 1];  
+                dataIndex--;  
+                packet[dataIndex] = '\0';  
+                unsigned char bcc_check = packet[0];
+                for (unsigned int j = 1; j < dataIndex; j++) {
+                    bcc_check ^= packet[j];
+                }
+                if (BCC2 == bcc_check) {
+                    state = READ;  
+                } 
+                else {
+                    if(frame_number == 0)c_response = C_REJ0;
+                    else c_response = C_REJ1;
+                    unsigned char frame[5] = {FLAG,A_recei,c_response,A_recei ^c_response,FLAG} ;
+                    write(fd, frame, 5);
+                    printf("Frame rejected.\n");
+                    printf("Error: BCC2 mismatch.\n");
+                    return -1;  
+                }
+                } 
+                else {
+                    packet[dataIndex++] = byte;
+                }
+            break;
+            case ESC_FLAG_READ:
+                state = BCC;
+                if (byte == FLAG || byte == ESC) {
+                    packet[dataIndex++] = byte;
                 } else {
-                    if (dataIndex < packetSize) {
-                        tempBuffer[dataIndex++] = byte; 
-                        if (dataIndex == 1)
-                            BCC2 = byte;  
-                        else
-                            BCC2 ^= byte;  
-                    } else {
-                        printf("Error: Packet buffer overflow.\n");
-                        return -1;  
-                    }
+                    packet[dataIndex++] = byte ^ 0x20;  
                 }
                 break;
+
+
             default:
                 break;
         }
     }
-
+    if(frame_number == 0)c_response = C_RR0;
+    else c_response = C_RR1;
+    unsigned char frame[5] = {FLAG,A_recei,c_response,A_recei ^c_response,FLAG} ;
+    write(fd, frame, 5);
     printf("Frame successfully received.\n");
-    return dataIndex;  
+    return dataIndex; 
 }
 
 
@@ -306,22 +337,22 @@ int llread(int fd, unsigned char *packet, int packetSize) {
 ////////////////////////////////////////////////
 // LLCLOSE
 ////////////////////////////////////////////////
-int llclose(LinkLayer connectionParameters, int fd, int showStatistics)
+int llclose(LinkLayer connectionParameters,int showStatistics)
 {
-    // Initialize variables
+    int fd = openSerialPort(connectionParameters.serialPort,connectionParameters.baudRate);
+    if(fd < 0)return -1;
     State state = START;
     unsigned char byte;
-    int alarmCount = 0;
+    alarmCount = 0;
     int alarmEnabled = FALSE;
     
-    (void)signal(SIGALRM, alarmHandler);  // Set up the alarm handler
+    (void)signal(SIGALRM, alarmHandler);  
     
-    // Sending DISC frame and waiting for DISC from the other end
     while (alarmCount <= connectionParameters.nRetransmissions) {
         if (alarmEnabled == FALSE) {
             unsigned char discFrame[5] = {FLAG, A_trans, C_DISC, A_trans ^ C_DISC, FLAG};
-            write(fd, discFrame, 5);   // Send DISC frame
-            alarm(connectionParameters.timeout);  // Set alarm for timeout
+            write(fd, discFrame, 5);   
+            alarm(connectionParameters.timeout);  
             alarmEnabled = TRUE;
         }
 
@@ -370,11 +401,8 @@ int llclose(LinkLayer connectionParameters, int fd, int showStatistics)
             return closeStatus;  
         }
 
-        alarmCount++;
     }
 
     printf("Error: Failed to receive DISC after %d retransmissions.\n", connectionParameters.nRetransmissions);
     return -1;
 }
-
-int retransmissions = 0;

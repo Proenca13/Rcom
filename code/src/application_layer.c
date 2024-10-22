@@ -22,4 +22,42 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         exit(-1);
     }
     else (printf("llopen works\n"));
+    switch(linkLayer.role){
+        case LlTx: {
+            printf("App layer transmitter works.\n");
+
+            // Define a simple text message to send
+            const char *textMessage = "Se as estrelas fossem tão bonitas como tu passava as noites em claro a olhar pro ceu!";
+            int messageLength = strlen(textMessage);
+
+            // Send the text message via llwrite
+            if (llwrite(linkLayer, (unsigned char *)textMessage, messageLength) < 0) {
+                printf("Error sending the message\n");
+            } else {
+                printf("Message sent successfully.\n");
+            }
+            llclose(linkLayer,0);
+            break;
+        }
+
+        case LlRx: {
+            printf("App layer receiver works.\n");
+
+            unsigned char buffer[BUF_SIZE];
+            int bytesRead;
+
+            // Receive the message via llread
+            bytesRead = llread(linkLayer, buffer);
+            if (bytesRead > 0) {
+                buffer[bytesRead] = '\0'; // Null-terminate the received text
+                printf("Received message: %s\n", buffer);
+            } else {
+                printf("Error reading the message or no data received\n");
+            }
+
+            break;
+        }
+        default:
+            break;
+    }
 }
