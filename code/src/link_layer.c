@@ -132,7 +132,7 @@ int llwrite(LinkLayer connectionParameters,const unsigned char *buf, int bufSize
     int fd = openSerialPort(connectionParameters.serialPort,connectionParameters.baudRate);
     if(fd < 0)return -1;
     int frame_size = 6 + bufSize;
-    unsigned char frame[frame_size];
+    unsigned char *frame = (unsigned char *)malloc(frame_size);
     frame[0] = FLAG;
     frame[1] = A_trans;
     if(frame_number == 0)frame[2] = 0x00;
@@ -145,20 +145,21 @@ int llwrite(LinkLayer connectionParameters,const unsigned char *buf, int bufSize
     }
     int j = 4;  
     for (unsigned int i = 0; i < bufSize; i++) {
-    if (buf[i] == FLAG || buf[i] == ESC) {
-        frame = realloc(frame, ++frameSize);
-        if (frame == NULL) {
-            perror("Memory allocation failed");
-            return -1;  
+        if (buf[i] == FLAG || buf[i] == ESC) {
+            frame = realloc(frame, ++frame_size);
+            if (frame == NULL) {
+                perror("Memory allocation failed");
+                return -1;  
+            }
+            frame[j++] = ESC;  
+            frame[j++] = buf[i] ^ 0x20;  
+        } 
+        else {
+            frame[j++] = buf[i];  
         }
-        frame[j++] = ESC;  
-        frame[j++] = buf[i] ^ 0x20;  
-    } else {
-        frame[j++] = buf[i];  
-    }
     }
     if (BCC2 == FLAG || BCC2 == ESC) {
-    frame = realloc(frame, ++frameSize);
+    frame = realloc(frame, ++frame_size);
     if (frame == NULL) {
         perror("Memory allocation failed");
         return -1;
@@ -170,7 +171,6 @@ int llwrite(LinkLayer connectionParameters,const unsigned char *buf, int bufSize
         frame[j++] = BCC2; 
     }
     frame[j++] = FLAG;
-
     alarmCount = 0;
     int accepted = 0;
     State state = START;
