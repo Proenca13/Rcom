@@ -57,7 +57,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         default:
             break;
     }
-    int fd1 = llclose(linkLayer,0);
+    int fd1 = llclose(linkLayer,1);
     if (fd1 < 0) {
         perror("Close error\n");
         exit(-1);

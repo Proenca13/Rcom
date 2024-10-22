@@ -353,35 +353,35 @@ int llclose(LinkLayer connectionParameters,int showStatistics)
                     alarm(timeout);  
                     alarmEnabled = TRUE;
                 }
-                while (alarmEnabled == TRUE && state != READ) {
-                    if (read(fd, &byte, 1) > 0) {
-                        switch (state) {
-                            case START:
-                                if (byte == FLAG) state = FLAG_ST;
-                                break;
-                            case FLAG_ST:
-                                if (byte == A_recei) state = A;
-                                else if (byte != FLAG) state = START;
-                                break;
-                            case A:
-                                if (byte == C_DISC) state = C;
-                                else if (byte == FLAG) state = FLAG_ST;
-                                else state = START;
-                                break;
-                            case C:
-                                if (byte == (A_recei ^ C_DISC)) state = BCC;
-                                else if (byte == FLAG) state = FLAG_ST;
-                                else state = START;
-                                break;
-                            case BCC:
-                                if (byte == FLAG) state = READ;
-                                else state = START;
-                                break;
-                            default:
-                                break;
-                        }
+                while (alarmEnabled == TRUE &&  state != READ){
+                if (read(fd,&byte,1) > 0) {
+                    switch(state){
+                        case START:
+                            if (byte == FLAG) state = FLAG_ST; 
+                            break;
+                        case FLAG_ST:
+                            if (byte == A_trans) state = A; 
+                            else if (byte != FLAG) state = START;
+                            break;
+                        case A:
+                            if(byte == C_DISC) state = C;
+                            else if (byte == FLAG) state = FLAG_ST;
+                            else state = START;
+                            break;
+                        case C:
+                            if(byte == (A_trans ^ C_DISC)) state = BCC;
+                            else if (byte == FLAG) state = FLAG_ST;
+                            else state = START;
+                            break;        
+                        case BCC:
+                            if(byte == FLAG) state = READ;
+                            else state = START;
+                            break;  
+                        default:
+                            break;         
                     }
-                }
+            }   
+            }
                 if (state == READ) {
                     printf("Received DISC frame. Sending UA frame.\n");
                     unsigned char uaFrame[5] = {FLAG, A_recei, C_UA, A_recei ^ C_UA, FLAG};
@@ -398,38 +398,78 @@ int llclose(LinkLayer connectionParameters,int showStatistics)
             }
         break;
     }
-        case LlRx:{
-            while (state != READ) {
-                    if (read(fd, &byte, 1) > 0) {
-                        printf("read");
-                        switch (state) {
-                            case START:
-                                if (byte == FLAG) state = FLAG_ST;
-                                break;
-                            case FLAG_ST:
-                                if (byte == A_recei) state = A;
-                                else if (byte != FLAG) state = START;
-                                break;
-                            case A:
-                                if (byte == C_DISC) state = C;
-                                else if (byte == FLAG) state = FLAG_ST;
-                                else state = START;
-                                break;
-                            case C:
-                                if (byte == (A_recei ^ C_DISC)) state = BCC;
-                                else if (byte == FLAG) state = FLAG_ST;
-                                else state = START;
-                                break;
-                            case BCC:
-                                if (byte == FLAG) state = READ;
-                                else state = START;
-                                break;
-                            default:
-                                break;
-                        }
+        case LlRx : {
+            while (state != READ){
+                if (read(fd,&byte,1) > 0) {
+                    switch(state){
+                        case START:
+                            if (byte == FLAG) state = FLAG_ST; 
+                            break;
+                        case FLAG_ST:
+                            if (byte == A_trans) state = A; 
+                            else if (byte != FLAG) state = START;
+                            break;
+                        case A:
+                            if(byte == C_DISC) state = C;
+                            else if (byte == FLAG) state = FLAG_ST;
+                            else state = START;
+                            break;
+                        case C:
+                            if(byte == (A_trans ^ C_DISC)) state = BCC;
+                            else if (byte == FLAG) state = FLAG_ST;
+                            else state = START;
+                            break;        
+                        case BCC:
+                            if(byte == FLAG) state = READ;
+                            else state = START;
+                            break;  
+                        default:
+                            break;         
                     }
+            }   
+            }
+            if (state == READ) {
+                    printf("Received DISC frame. Sending DISC receiver frame.\n");
+                    write(fd, discFrame, 5);
+                    state = START;
+                    while (state != READ){
+                        if (read(fd,&byte,1) > 0) {
+                            switch(state){
+                                case START:
+                                    if (byte == FLAG) state = FLAG_ST; 
+                                    break;
+                                case FLAG_ST:
+                                    if (byte == A_recei) state = A; 
+                                    else if (byte != FLAG) state = START;
+                                    break;
+                                case A:
+                                    if(byte == C_UA) state = C;
+                                    else if (byte == FLAG) state = FLAG_ST;
+                                    else state = START;
+                                    break;
+                                case C:
+                                    if(byte == (A_recei ^ C_UA)) state = BCC;
+                                    else if (byte == FLAG) state = FLAG_ST;
+                                    else state = START;
+                                    break;        
+                                case BCC:
+                                    if(byte == FLAG) state = READ;
+                                    else state = START;
+                                    break;  
+                                default:
+                                    break;         
+                            }
+                    }   
+                    }
+                    if(state== READ){
+                    printf("Received UA frame. Closing connection.\n");
+                    int closeStatus = closeSerialPort(fd);
+                    if (showStatistics) {
+                        printf("Connection closed successfully. Statistics displayed.\n");
+                    }
+                    return closeStatus;
+                    }  
                 }
-            write(fd, discFrame, 5);
             break;
         }
         default:
