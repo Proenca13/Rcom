@@ -71,7 +71,6 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
                 data += buf_size;
             }
             fclose(file); 
-
             int endPacketSize;
             unsigned char *endControlPacket = buildControlPacket(3, fileSize, filename, &endPacketSize);
             if (endControlPacket == NULL) {
@@ -95,21 +94,26 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
             while((bytesRead = llread(fd, buffer))<0);
             int fileSize = 0;
             unsigned char* fileName = readControlPacket(buffer, bytesRead, &fileSize); 
-            //FILE *write_file = fopen(fileName, "wb");
+            FILE *file = fopen((char*)filename, "wb");
+            if (file == NULL) {
+                perror("Error opening file\n");
+                exit(-1);
+            }
             while (!endOfTransmission) {
                 bytesRead = llread(fd, buffer);
                 if (bytesRead < 0) {
                     printf("Error receiving data\n");
                     exit(-1);
                 }
-
-                if (buffer[0] == 1) { 
-                    printf("Received START control packet\n");
-                } else if (buffer[0] == 3) { 
+                if (buffer[0] == 3) { 
                     printf("Received END control packet\n");
                     printf("Filename: %s, Size: %d bytes\n", fileName, fileSize); 
                     endOfTransmission = 1;
                 } else {
+                    unsigned char* buf = (unsigned char*) malloc(bytesRead);
+                    memcpy(buf,buffer+4,bytesRead-4);
+                    fwrite(buf, 1, bytesRead-4, file);
+                    free(buf);
                     printf("Received data packet\n");
                 }
             }
