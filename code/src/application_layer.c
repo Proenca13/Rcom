@@ -25,13 +25,10 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
     switch(linkLayer.role){
         case LlTx: {
             printf("App layer transmitter works.\n");
-
-            // Define a simple text message to send
             const char *textMessage = "Se as estrelas fossem tão bonitas como tu passava as noites em claro a olhar pro ceu!";
             int messageLength = strlen(textMessage);
 
-            // Send the text message via llwrite
-            if (llwrite(linkLayer, (unsigned char *)textMessage, messageLength) < 0) {
+            if (llwrite(fd, (unsigned char *)textMessage, messageLength) < 0) {
                 printf("Error sending the message\n");
             } else {
                 printf("Message sent successfully.\n");
@@ -40,14 +37,11 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         }
         case LlRx: {
             printf("App layer receiver works.\n");
-
             unsigned char buffer[BUF_SIZE];
             int bytesRead;
-
-            // Receive the message via llread
-            bytesRead = llread(linkLayer, buffer);
+            bytesRead = llread(fd, buffer);
             if (bytesRead > 0) {
-                buffer[bytesRead] = '\0'; // Null-terminate the received text
+                buffer[bytesRead] = '\0'; 
                 printf("Received message: %s\n", buffer);
             } else {
                 printf("Error reading the message or no data received\n");
@@ -57,7 +51,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         default:
             break;
     }
-    int fd1 = llclose(linkLayer,1);
+    int fd1 = llclose(fd,linkLayer.role,1);
     if (fd1 < 0) {
         perror("Close error\n");
         exit(-1);

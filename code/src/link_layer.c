@@ -17,6 +17,7 @@
 #define _POSIX_SOURCE 1 // POSIX compliant source
 
 int timeout = 0;
+int transmitions = 0;
 int alarmEnabled = FALSE;
 int alarmCount = 0;
 int frame_number = 0;
@@ -34,13 +35,14 @@ int llopen(LinkLayer connectionParameters)
     if(fd < 0)return -1;
     State state = START;
     timeout = connectionParameters.timeout;
+    transmitions = connectionParameters.nRetransmissions;
     alarmCount = 0;
     unsigned char byte;
     switch(connectionParameters.role){
         case(LlTx) :{
             (void)signal(SIGALRM, alarmHandler);
             unsigned char frame[5] = {FLAG,A_trans,C_SET,A_trans ^C_SET,FLAG} ;
-            while (alarmCount <= connectionParameters.nRetransmissions){
+            while (alarmCount <= transmitions){
             if (alarmEnabled == FALSE){
                 write(fd, frame, 5);
                 alarm(timeout); 
@@ -77,7 +79,7 @@ int llopen(LinkLayer connectionParameters)
             }
             if(state == READ){
                 printf("Received UA frame. Connection established.\n");
-                return 1;
+                return fd;
             }
         }
         break;
@@ -116,7 +118,7 @@ int llopen(LinkLayer connectionParameters)
                 unsigned char frame[5] = {FLAG,A_recei,C_UA,A_recei ^C_UA,FLAG} ;
                 write(fd, frame, 5);
                 printf("Sent UA frame. Connection established.\n");
-                return 1;
+                return fd;
             }
             break;
         }
@@ -127,10 +129,8 @@ int llopen(LinkLayer connectionParameters)
     return -1;
 }
 
-int llwrite(LinkLayer connectionParameters,const unsigned char *buf, int bufSize)
+int llwrite(int fd,const unsigned char *buf, int bufSize)
 {
-    int fd = openSerialPort(connectionParameters.serialPort,connectionParameters.baudRate);
-    if(fd < 0)return -1;
     int frame_size = 6 + bufSize;
     unsigned char *frame = (unsigned char *)malloc(frame_size);
     frame[0] = FLAG;
@@ -178,8 +178,7 @@ int llwrite(LinkLayer connectionParameters,const unsigned char *buf, int bufSize
     unsigned char C_byte;
     unsigned char byte;
     (void)signal(SIGALRM, alarmHandler);
-    timeout = connectionParameters.timeout;
-    while (alarmCount <= connectionParameters.nRetransmissions ){
+    while (alarmCount <= transmitions ){
             if (alarmEnabled == FALSE){
                 write(fd, frame, frame_size);
                 alarm(timeout); 
@@ -226,7 +225,7 @@ int llwrite(LinkLayer connectionParameters,const unsigned char *buf, int bufSize
                 }
             }
             if(accepted){
-                alarmCount = connectionParameters.nRetransmissions+1;
+                alarmCount = transmitions+1;
                 alarm(0);
                 alarmEnabled = FALSE;
                 break;
@@ -239,8 +238,7 @@ int llwrite(LinkLayer connectionParameters,const unsigned char *buf, int bufSize
 }
 
 
-int llread(LinkLayer connectionParameters,unsigned char *packet) {
-    int fd = openSerialPort(connectionParameters.serialPort,connectionParameters.baudRate);
+int llread(int fd,unsigned char *packet) {
     State state = START;
     unsigned char byte;
     unsigned char C_byte;
@@ -334,20 +332,17 @@ int llread(LinkLayer connectionParameters,unsigned char *packet) {
     return dataIndex; 
 }
 
-int llclose(LinkLayer connectionParameters,int showStatistics)
+int llclose(int fd,LinkLayerRole role,int showStatistics)
 {
-    int fd = openSerialPort(connectionParameters.serialPort,connectionParameters.baudRate);
-    if(fd < 0)return -1;
     State state = START;
     unsigned char byte;
     alarmCount = 0;
     alarmEnabled = FALSE;
-    timeout = connectionParameters.timeout;
     unsigned char discFrame[5] = {FLAG, A_trans, C_DISC, A_trans ^ C_DISC, FLAG};
-    switch(connectionParameters.role){
+    switch(role){
         case LlTx : {
             (void)signal(SIGALRM, alarmHandler);  
-            while (alarmCount <= connectionParameters.nRetransmissions) {
+            while (alarmCount <= transmitions) {
                 if (alarmEnabled == FALSE) {
                     write(fd, discFrame, 5);   
                     alarm(timeout);  
@@ -475,6 +470,6 @@ int llclose(LinkLayer connectionParameters,int showStatistics)
         default:
             break;
     }
-    printf("Error: Failed to receive DISC after %d retransmissions.\n", connectionParameters.nRetransmissions);
+    printf("Error: Failed to receive DISC after %d retransmissions.\n", transmitions);
     return -1;
 }
