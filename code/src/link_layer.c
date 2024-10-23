@@ -248,7 +248,6 @@ int llread(int fd,unsigned char *packet) {
         if (read(fd, &byte, 1) <= 0) {
             continue;  
         }
-
         switch (state) {
             case START:
                 if (byte == FLAG)
