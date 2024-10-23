@@ -35,7 +35,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
             }
             */
             unsigned char dataMessage[] = {
-                0x01, 0x02, 0x7D, 0x03, 0x04 ,0x7e
+                0x7E, 0x00
             };
             int dataLength = sizeof(dataMessage) / sizeof(dataMessage[0]);
 
@@ -62,11 +62,12 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
             unsigned char buffer[BUF_SIZE];
             int bytesRead;
             
+            // Read the data (link layer handles decoding flags/escapes)
             bytesRead = llread(fd, buffer);
             if (bytesRead > 0) {
                 printf("Received %d bytes of data in hexadecimal:\n", bytesRead);
                 for (int i = 0; i < bytesRead; i++) {
-                    printf("%02X ", buffer[i]); // Print each byte in hex format
+                    printf("0x%02X ", buffer[i]); // Print each byte in hex format
                 }
                 printf("\n");
             } else {

@@ -143,6 +143,7 @@ int llwrite(int fd,const unsigned char *buf, int bufSize)
     for(int i = 1;i<= bufSize;i++){
         BCC2 = BCC2 ^ buf[i];
     }
+    printf("0x%02X ", BCC2);
     int j = 4;  
     for (unsigned int i = 0; i < bufSize; i++) {
         if (buf[i] == FLAG || buf[i] == ESC) {
@@ -160,15 +161,20 @@ int llwrite(int fd,const unsigned char *buf, int bufSize)
     }
     if (BCC2 == FLAG || BCC2 == ESC) {
     frame = realloc(frame, ++frame_size);
-    if (frame == NULL) {
-        perror("Memory allocation failed");
-        return -1;
-    }
-    frame[j++] = ESC;
-    frame[j++] = BCC2 ^ 0x20; 
+        if (frame == NULL) {
+            perror("Memory allocation failed");
+            return -1;
+        }
+        frame[j++] = ESC;
+        frame[j++] = BCC2 ^ 0x20; 
+        printf("0x%02X ", frame[j-2]);
+        printf("0x%02X ", frame[j-1]);
+
     } 
     else {
-        frame[j++] = BCC2; 
+        frame[j++] = BCC2;
+        printf("0x%02X ", frame[j-1]);
+ 
     }
     frame[j++] = FLAG;
     alarmCount = 0;
@@ -292,6 +298,8 @@ int llread(int fd,unsigned char *packet) {
                 for (unsigned int j = 1; j < dataIndex; j++) {
                     bcc_check ^= packet[j];
                 }
+                printf("0x%02X ", BCC2);
+                printf("0x%02X ", bcc_check);
                 if (BCC2 == bcc_check) {
                     state = READ;  
                 } 
