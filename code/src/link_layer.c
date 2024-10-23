@@ -229,13 +229,13 @@ int llwrite(int fd,const unsigned char *buf, int bufSize)
                     accepted = 1;
                     frame_number = (frame_number+1)%2;
                 }
+           
             }
             if(accepted){
                 alarmCount = transmitions+1;
                 alarm(0);
                 alarmEnabled = FALSE;
                 break;
-
             }
     }
     free(frame);
@@ -251,9 +251,7 @@ int llread(int fd,unsigned char *packet) {
     int dataIndex = 0;  
     unsigned char c_response;
     while (state != READ) {
-        if (read(fd, &byte, 1) <= 0) {
-            continue;  
-        }
+        if (read(fd, &byte, 1) > 0) {
         switch (state) {
             case START:
                 if (byte == FLAG)
@@ -330,6 +328,7 @@ int llread(int fd,unsigned char *packet) {
             default:
                 break;
         }
+        }   
     }
     if(frame_number == 0)c_response = C_RR0;
     else c_response = C_RR1;

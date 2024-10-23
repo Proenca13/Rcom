@@ -5,6 +5,7 @@
 #include "stdio.h"
 #include "stdlib.h"
 #include "string.h"
+#include <sys/stat.h>
 
 void applicationLayer(const char *serialPort, const char *role, int baudRate,
                       int nTries, int timeout, const char *filename)
@@ -24,55 +25,45 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
     else (printf("llopen works\n"));
     switch(linkLayer.role){
         case LlTx: {
-            /*
-            const char *textMessage = "Se as estrelas fossem tão bonitas como tu passava as noites em claro a olhar pro ceu!";
-            int messageLength = strlen(textMessage);
+            FILE *file = fopen(filename, "rb"); 
+            if (file == NULL) {
+                perror("Erro ao abrir o ficheiro\n");
+                exit(-1);
+            }
+            struct stat st;
+            if (fstat(fd, &st) != 0) {
+                perror("Erro ao calcular o tamanho do ficheiro\n");
+                exit(-1);
+            }
+            int fileSize = st.st_size;
+            unsigned char startControlPacket[];
+            int startPacketSize = buildControlPacket(1, fileSize, filename,startControlPacket);  
+            if (llwrite(fd, startControlPacket, startPacketSize) < 0) {
+                printf("Erro ao enviar o pacote de controle (START)\n");
+                exit(-1);
+            } else {
+                printf("Pacote de controle (START) enviado com sucesso.\n");
+            }
             
-            if (llwrite(fd, (unsigned char *)textMessage, messageLength) < 0) {
-                printf("Error sending the message\n");
-            } else {
-                printf("Message sent successfully.\n");
-            }
-            */
-            unsigned char dataMessage[] = {
-                0x7E, 0x00
-            };
-            int dataLength = sizeof(dataMessage) / sizeof(dataMessage[0]);
+            // Enviar o conteúdo do ficheiro
+            fclose(file);
 
-        
-            if (llwrite(fd, dataMessage, dataLength) < 0) {
-                printf("Error sending the message\n");
+            unsigned char endControlPacket[] ;
+            int endPacketSize =  buildControlPacket(3,fileSize, filename, endControlPacket);  
+            if (llwrite(fd, endControlPacket, endPacketSize) < 0) {
+                printf("Erro ao enviar o pacote de controle (END)\n");
+                exit(-1);
             } else {
-                printf("Message sent successfully (data only).\n");
+                printf("Pacote de controle (END) enviado com sucesso.\n");
             }
+
             break;
         }
         case LlRx: {
-            /*
-            unsigned char buffer[BUF_SIZE];
-            int bytesRead;
-            bytesRead = llread(fd, buffer);
-            if (bytesRead > 0) {
-                buffer[bytesRead] = '\0'; 
-                printf("Received message: %s\n", buffer);
-            } else {
-                printf("Error reading the message or no data received\n");
-            }
-            */
-            unsigned char buffer[BUF_SIZE];
-            int bytesRead;
-            
-            // Read the data (link layer handles decoding flags/escapes)
-            bytesRead = llread(fd, buffer);
-            if (bytesRead > 0) {
-                printf("Received %d bytes of data in hexadecimal:\n", bytesRead);
-                for (int i = 0; i < bytesRead; i++) {
-                    printf("0x%02X ", buffer[i]); // Print each byte in hex format
-                }
-                printf("\n");
-            } else {
-                printf("Error reading the message or no data received\n");
-            }
+            unsigned char buffer[MAX_PAYLOAD_SIZE];  
+            int bytesRead = -1;
+            while((bytesRead = llread(fd, buffer))<0); 
+            int endOfTransmission = 0;
             break;
         }
         default:
@@ -85,3 +76,25 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
     }
     else (printf("close works\n"));
 }
+unsigned char * buildControlPacket(int control_field,int fileSize,unsigned char* fileName,int *controlpacketSize){
+    int offset = 0;
+
+    controlpacket[offset++] = control_field;
+
+    controlpacket[offset++] = 0x00;              
+    controlpacket[offset++] = sizeof(int);       
+    memcpy(&controlpacket[offset], &fileSize, sizeof(int)); 
+    offset += sizeof(int);                        
+
+    int fileNameLength = strlen((char*)fileName); 
+    controlpacket[offset++] = 0x01;             
+    controlpacket[offset++] = fileNameLength;    
+    memcpy(&controlpacket[offset], fileName, fileNameLength); 
+    offset += fileNameLength;                    
+
+    return offset;
+}
+int readControlPacket(unsigned char* controlpacket,int packetSize,unsigned char* fileName){
+    return -1;
+}
+
