@@ -51,9 +51,25 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
                 printf("Control packet (START) sent successfully.\n");
             }
             free(startControlPacket);
-
-            // Send file content (not implemented here)
-
+            unsigned char sequence = 0;
+            unsigned char * data = (unsigned char*)malloc(fileSize);
+            fread(data, 1, fileSize, file);
+            int bytes_read = 0;
+            while(bytes_read < fileSize){
+                int buf_size = 0;
+                if ((fileSize-bytes_read)<MAX_PAYLOAD_SIZE) buf_size = fileSize-bytes_read;
+                else buf_size = MAX_PAYLOAD_SIZE;
+                unsigned char* buf = (unsigned char*) malloc(buf_size);
+                memcpy(buf,data,buf_size);
+                unsigned char* dataPacket = buildDataPacket(sequence,buf,buf_size);
+                 if(llwrite(fd, dataPacket, 4+buf_size) == -1) {
+                    printf("Exit writting data!\n");
+                    exit(-1);
+                }
+                sequence = (sequence+1)%99;
+                bytes_read += buf_size;
+                data += buf_size;
+            }
             fclose(file); 
 
             int endPacketSize;
@@ -152,4 +168,17 @@ unsigned char * readControlPacket(unsigned char* controlpacket,int packetSize,in
     printf("Number of bytes: %d\n", result);
     unsigned char* m = &controlpacket[3+number_bytes_file+2];
     return m;
+}
+unsigned char * buildDataPacket(unsigned char sequence, unsigned char *data_field, int dataFieldSize){
+    unsigned char* packet = (unsigned char*)malloc(4 + dataFieldSize);
+    if (packet == NULL) {
+        printf("Memory allocation failed\n");
+        return NULL; 
+    }
+    packet[0] = 2;
+    packet[1] = sequence;
+    packet[2] = dataFieldSize >> 8 & 0xff;
+    packet[3] = dataFieldSize & 0xff;
+    memcpy(packet+4,data_field,dataFieldSize);
+    return packet;
 }
