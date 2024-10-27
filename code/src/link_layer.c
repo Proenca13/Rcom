@@ -11,7 +11,7 @@
 #include <termios.h>
 #include <unistd.h>
 #include <signal.h>
-
+#include <time.h>
 
 // MISC
 #define _POSIX_SOURCE 1 // POSIX compliant source
@@ -21,6 +21,11 @@ int transmitions = 0;
 int alarmEnabled = FALSE;
 int alarmCount = 0;
 int frame_number = 0;
+int errors = 0;
+clock_t start_time;
+int bits_recei = 0;
+int bits_Sent = 0;
+
 void alarmHandler(int signal)
 {
     alarmEnabled = FALSE;
@@ -143,7 +148,6 @@ int llwrite(int fd,const unsigned char *buf, int bufSize)
     for(int i = 1;i<= bufSize;i++){
         BCC2 = BCC2 ^ buf[i];
     }
-    printf("0x%02X ", BCC2);
     int j = 4;  
     for (unsigned int i = 0; i < bufSize; i++) {
         if (buf[i] == FLAG || buf[i] == ESC) {
@@ -167,13 +171,11 @@ int llwrite(int fd,const unsigned char *buf, int bufSize)
         }
         frame[j++] = ESC;
         frame[j++] = BCC2 ^ 0x20; 
-        printf("0x%02X ", frame[j-2]);
-        printf("0x%02X ", frame[j-1]);
+  
 
     } 
     else {
         frame[j++] = BCC2;
-        printf("0x%02X ", frame[j-1]);
  
     }
     frame[j++] = FLAG;
@@ -187,6 +189,7 @@ int llwrite(int fd,const unsigned char *buf, int bufSize)
     while (alarmCount <= transmitions ){
             if (alarmEnabled == FALSE){
                 write(fd, frame, frame_size);
+                bits_Sent += frame_size * 8;
                 alarm(timeout); 
                 alarmEnabled =  TRUE;
             }
@@ -228,6 +231,10 @@ int llwrite(int fd,const unsigned char *buf, int bufSize)
                 if(C_byte == C_RR0 || C_byte == C_RR1){
                     accepted = 1;
                     frame_number = (frame_number+1)%2;
+                    bits_recei += frame_size *8;
+                }
+                else if(C_byte == C_REJ0 || C_byte== C_REJ1){
+                    errors++;
                 }
            
             }
@@ -296,8 +303,6 @@ int llread(int fd,unsigned char *packet) {
                 for (unsigned int j = 1; j < dataIndex; j++) {
                     bcc_check ^= packet[j];
                 }
-                printf("0x%02X ", BCC2);
-                printf("0x%02X ", bcc_check);
                 if (BCC2 == bcc_check) {
                     state = READ;  
                 } 
@@ -390,6 +395,15 @@ int llclose(int fd,LinkLayerRole role,int showStatistics)
                     printf("UA frame sent. Closing connection.\n");
                     int closeStatus = closeSerialPort(fd);
                     if (showStatistics) {
+                        double time_taken = endClock(); 
+                        printf("Time elapsed: %f seconds\n", time_taken);
+                        printf("Number of rejected frames: %i\n",errors);
+                        double bits_Sent_second = bits_Sent/time_taken;
+                        double bits_recei_second = bits_recei/time_taken;
+                        printf("Bits received %i\n",bits_recei);
+                        printf("Bits received per second: %f\n", bits_recei_second);
+                        printf("Bits sent %i\n",bits_Sent);
+                        printf("Bits sent per second %f\n", bits_Sent_second);
                         printf("Connection closed successfully. Statistics displayed.\n");
                     }
 
@@ -466,6 +480,8 @@ int llclose(int fd,LinkLayerRole role,int showStatistics)
                     printf("Received UA frame. Closing connection.\n");
                     int closeStatus = closeSerialPort(fd);
                     if (showStatistics) {
+                        double time_taken = endClock(); 
+                        printf("Time elapsed: %f seconds\n", time_taken);
                         printf("Connection closed successfully. Statistics displayed.\n");
                     }
                     return closeStatus;
@@ -478,4 +494,14 @@ int llclose(int fd,LinkLayerRole role,int showStatistics)
     }
     printf("Error: Failed to receive DISC after %d retransmissions.\n", transmitions);
     return -1;
+}
+
+void startClock() {
+    start_time = clock(); 
+}
+
+double endClock() {
+    clock_t end_time = clock(); 
+    double elapsed_time = (double)(end_time - start_time) / CLOCKS_PER_SEC;
+    return elapsed_time;
 }

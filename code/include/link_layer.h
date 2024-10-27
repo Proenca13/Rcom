@@ -69,4 +69,8 @@ int llread(int fd,unsigned char *packet);
 // Return "1" on success or "-1" on error.
 int llclose(int fd, LinkLayerRole role, int showStatistics);
 
+void startClock();
+
+double endClock() ;
+
 #endif // _LINK_LAYER_H_

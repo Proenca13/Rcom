@@ -19,10 +19,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
     if (fd < 0) {
         perror("Connection error\n");
         exit(-1);
-    } else {
-        printf("llopen works\n");
-    }
-
+    } 
     switch (linkLayer.role) {
         case LlTx: {
             FILE *file = fopen(filename, "rb");
@@ -36,7 +33,6 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
                 exit(-1);
             }
             int fileSize = st.st_size;
-            printf("Number of bytes: %d\n",fileSize);
             int startPacketSize;
             unsigned char *startControlPacket = buildControlPacket(1, fileSize, filename, &startPacketSize);
             if (startControlPacket == NULL) {
@@ -127,9 +123,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
     if (result < 0) {
         perror("Close error\n");
         exit(-1);
-    } else {
-        printf("Connection closed successfully\n");
-    }
+    } 
 }
 
 unsigned char* buildControlPacket(int control_field, int fileSize, const char* fileName, int *controlpacketSize) {
