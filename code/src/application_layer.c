@@ -39,7 +39,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
                 perror("Error building start control packet\n");
                 exit(-1);
             }
-            if (llwrite(fd, startControlPacket, startPacketSize) < 0) {
+            if (llwrite(startControlPacket, startPacketSize) < 0) {
                 printf("Error sending control packet (START)\n");
                 free(startControlPacket); 
                 exit(-1);
@@ -58,7 +58,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
                 unsigned char* buf = (unsigned char*) malloc(buf_size);
                 memcpy(buf,data,buf_size);
                 unsigned char* dataPacket = buildDataPacket(sequence,buf,buf_size);
-                 if(llwrite(fd, dataPacket, 4+buf_size) == -1) {
+                 if(llwrite(dataPacket, 4+buf_size) == -1) {
                     printf("Exit writting data!\n");
                     exit(-1);
                 }
@@ -73,7 +73,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
                 perror("Error building end control packet\n");
                 exit(-1);
             }
-            if (llwrite(fd, endControlPacket, endPacketSize) < 0) {
+            if (llwrite(endControlPacket, endPacketSize) < 0) {
                 printf("Error sending control packet (END)\n");
                 free(endControlPacket); 
                 exit(-1);
@@ -87,7 +87,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
             unsigned char buffer[MAX_PAYLOAD_SIZE];
             int bytesRead = -1;
             int endOfTransmission = 0;
-            while((bytesRead = llread(fd, buffer))<0);
+            while((bytesRead = llread(buffer))<0);
             int fileSize = 0;
             unsigned char* fileName = readControlPacket(buffer, bytesRead, &fileSize); 
             FILE *file = fopen((char*)filename, "wb");
@@ -96,7 +96,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
                 exit(-1);
             }
             while (!endOfTransmission) {
-                bytesRead = llread(fd, buffer);
+                bytesRead = llread(buffer);
                 if (bytesRead < 0) {
                     printf("Error receiving data\n");
                     exit(-1);
@@ -119,7 +119,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         default:
             break;
     }
-    int result = llclose(fd, linkLayer.role, 1);
+    int result = llclose( 1);
     if (result < 0) {
         perror("Close error\n");
         exit(-1);

@@ -25,6 +25,8 @@ int errors = 0;
 clock_t start_time;
 int bits_recei = 0;
 int bits_Sent = 0;
+extern int fd;
+LinkLayerRole role;
 
 void alarmHandler(int signal)
 {
@@ -36,14 +38,15 @@ void alarmHandler(int signal)
 
 int llopen(LinkLayer connectionParameters)
 {   
-    int fd = openSerialPort(connectionParameters.serialPort,connectionParameters.baudRate);
+    openSerialPort(connectionParameters.serialPort,connectionParameters.baudRate);
     if(fd < 0)return -1;
     State state = START;
     timeout = connectionParameters.timeout;
     transmitions = connectionParameters.nRetransmissions;
     alarmCount = 0;
     unsigned char byte;
-    switch(connectionParameters.role){
+    role = connectionParameters.role;
+    switch(role){
         case(LlTx) :{
             (void)signal(SIGALRM, alarmHandler);
             unsigned char frame[5] = {FLAG,A_trans,C_SET,A_trans ^C_SET,FLAG} ;
@@ -134,7 +137,7 @@ int llopen(LinkLayer connectionParameters)
     return -1;
 }
 
-int llwrite(int fd,const unsigned char *buf, int bufSize)
+int llwrite(const unsigned char *buf, int bufSize)
 {
     int frame_size = 6 + bufSize;
     unsigned char *frame = (unsigned char *)malloc(frame_size);
@@ -251,7 +254,7 @@ int llwrite(int fd,const unsigned char *buf, int bufSize)
 }
 
 
-int llread(int fd,unsigned char *packet) {
+int llread(unsigned char *packet) {
     State state = START;
     unsigned char byte;
     unsigned char C_byte;
@@ -343,7 +346,7 @@ int llread(int fd,unsigned char *packet) {
     return dataIndex; 
 }
 
-int llclose(int fd,LinkLayerRole role,int showStatistics)
+int llclose(int showStatistics)
 {
     State state = START;
     unsigned char byte;
