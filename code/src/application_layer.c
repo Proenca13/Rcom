@@ -96,7 +96,10 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
                 exit(-1);
             }
             while (!endOfTransmission) {
-                bytesRead = llread(buffer);
+                while(1){
+                    bytesRead = llread(buffer);
+                    if(bytesRead > 0)break;
+                }
                 if (bytesRead < 0) {
                     printf("Error receiving data\n");
                     exit(-1);

@@ -27,6 +27,8 @@ int bits_recei = 0;
 int bits_Sent = 0;
 extern int fd;
 LinkLayerRole role;
+char serialPort[50];
+int baudRate;
 
 void alarmHandler(int signal)
 {
@@ -38,7 +40,9 @@ void alarmHandler(int signal)
 
 int llopen(LinkLayer connectionParameters)
 {   
-    openSerialPort(connectionParameters.serialPort,connectionParameters.baudRate);
+    baudRate = connectionParameters.baudRate;
+    memcpy(serialPort, connectionParameters.serialPort, 50);
+    openSerialPort(serialPort,baudRate);
     if(fd < 0)return -1;
     State state = START;
     timeout = connectionParameters.timeout;
@@ -185,16 +189,20 @@ int llwrite(const unsigned char *buf, int bufSize)
     alarmCount = 0;
     alarmEnabled = FALSE;
     int accepted = 0;
+    int rejected = 0;
     State state = START;
     unsigned char C_byte;
     unsigned char byte;
     (void)signal(SIGALRM, alarmHandler);
     while (alarmCount <= transmitions ){
             if (alarmEnabled == FALSE){
-                write(fd, frame, frame_size);
+                if(write(fd, frame, frame_size) == -1){
+                    openSerialPort(serialPort,baudRate);
+                }
                 bits_Sent += frame_size * 8;
                 alarm(timeout); 
                 alarmEnabled =  TRUE;
+                rejected = 0;
             }
             while (alarmEnabled == TRUE && state != READ){  
                 if (read(fd,&byte,1) > 0){
@@ -237,6 +245,7 @@ int llwrite(const unsigned char *buf, int bufSize)
                     bits_recei += frame_size *8;
                 }
                 else if(C_byte == C_REJ0 || C_byte== C_REJ1){
+                    rejected = 1;
                     errors++;
                 }
            
@@ -246,6 +255,12 @@ int llwrite(const unsigned char *buf, int bufSize)
                 alarm(0);
                 alarmEnabled = FALSE;
                 break;
+            }
+            if(rejected){
+                alarm(0);
+                printf("Frame rejected!\n");
+                alarmHandler(SIGALRM);
+                state = START;
             }
     }
     free(frame);
@@ -260,8 +275,10 @@ int llread(unsigned char *packet) {
     unsigned char C_byte;
     int dataIndex = 0;  
     unsigned char c_response;
+    int readByte = 0;
     while (state != READ) {
-        if (read(fd, &byte, 1) > 0) {
+        readByte = read(fd, &byte, 1) ;
+        if (readByte > 0) {
         switch (state) {
             case START:
                 if (byte == FLAG)
@@ -336,12 +353,15 @@ int llread(unsigned char *packet) {
             default:
                 break;
         }
-        }   
+        }
+        else if(readByte <0) {
+            openSerialPort(serialPort,baudRate);
+        }
     }
     if(frame_number == 0)c_response = C_RR0;
     else c_response = C_RR1;
     unsigned char frame[5] = {FLAG,A_recei,c_response,A_recei ^c_response,FLAG} ;
-    write(fd, frame, 5);
+    write(fd,frame,5);
     printf("Frame successfully received.\n");
     return dataIndex; 
 }
@@ -396,7 +416,7 @@ int llclose(int showStatistics)
                     unsigned char uaFrame[5] = {FLAG, A_recei, C_UA, A_recei ^ C_UA, FLAG};
                     write(fd, uaFrame, 5);
                     printf("UA frame sent. Closing connection.\n");
-                    int closeStatus = closeSerialPort(fd);
+                    int closeStatus = closeSerialPort();
                     if (showStatistics) {
                         double time_taken = endClock(); 
                         printf("Time elapsed: %f seconds\n", time_taken);
@@ -481,7 +501,7 @@ int llclose(int showStatistics)
                     }
                     if(state== READ){
                     printf("Received UA frame. Closing connection.\n");
-                    int closeStatus = closeSerialPort(fd);
+                    int closeStatus = closeSerialPort();
                     if (showStatistics) {
                         double time_taken = endClock(); 
                         printf("Time elapsed: %f seconds\n", time_taken);
