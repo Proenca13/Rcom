@@ -96,7 +96,8 @@ int openSerialPort(const char *serialPort, int baudRate)
 // Restore original port settings and close the serial port.
 // Returns -1 on error.
 int closeSerialPort(void)
-{
+{   
+    sleep(1);
     // Restore the old port settings
     if (tcsetattr(fd, TCSANOW, &oldtio) == -1)
     {
