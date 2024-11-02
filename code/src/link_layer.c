@@ -152,7 +152,7 @@ int llwrite(const unsigned char *buf, int bufSize)
     frame[3] = A_trans ^ frame[2];
     memcpy(frame + 4,buf, bufSize);
     unsigned char BCC2  = buf[0];
-    for(int i = 1;i<= bufSize;i++){
+    for(int i = 1;i<  bufSize;i++){
         BCC2 = BCC2 ^ buf[i];
     }
     int j = 4;  
@@ -171,19 +171,17 @@ int llwrite(const unsigned char *buf, int bufSize)
         }
     }
     if (BCC2 == FLAG || BCC2 == ESC) {
-    frame = realloc(frame, ++frame_size);
+        frame = realloc(frame, ++frame_size);
         if (frame == NULL) {
             perror("Memory allocation failed");
             return -1;
         }
         frame[j++] = ESC;
         frame[j++] = BCC2 ^ 0x20; 
-  
 
     } 
     else {
         frame[j++] = BCC2;
- 
     }
     frame[j++] = FLAG;
     alarmCount = 0;
