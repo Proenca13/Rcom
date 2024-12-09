@@ -11,6 +11,7 @@ void error(const char *msg) {
     perror(msg);
     exit(EXIT_FAILURE);
 }
+
 void parse_pasv_response(const char *response, char *ip, int *port) {
     int ip1, ip2, ip3, ip4, p1, p2;
 
@@ -23,15 +24,26 @@ void parse_pasv_response(const char *response, char *ip, int *port) {
     // Construir o número da porta
     *port = p1 * 256 + p2;
 }
+
 int main() {
     int control_sock, data_sock;
     char buffer[BUFFER_SIZE];
     char ip[16];
     int port;
+    char ftp_server[256], file_path[256], username[256], password[256];
 
-    // Configurações do servidor FTP
-    const char *ftp_server = "mirrors.up.pt";
-    int ftp_port = 21;
+    // Pedir ao usuário as informações
+    printf("Enter the FTP server URL (e.g., mirrors.up.pt): ");
+    scanf("%255s", ftp_server);
+
+    printf("Enter the file path on the server (e.g., /debian/README.html): ");
+    scanf("%255s", file_path);
+
+    printf("Enter the username (or 'anonymous'): ");
+    scanf("%255s", username);
+
+    printf("Enter the password (or 'anonymous'): ");
+    scanf("%255s", password);
 
     // Resolver IP usando getip.c
     if (resolve_hostname_to_ip(ftp_server, ip) != 0) {
@@ -41,7 +53,7 @@ int main() {
 
     // Criar e conectar socket de controle usando clientTCP.c
     control_sock = create_socket();
-    if (connect_to_server(control_sock, ip, ftp_port) != 0) {
+    if (connect_to_server(control_sock, ip, 21) != 0) {
         error("Erro ao conectar ao servidor FTP");
     }
 
@@ -52,34 +64,26 @@ int main() {
     }
 
     // Autenticação
-    write(control_sock, "USER anonymous\r\n", 16);
+    sprintf(buffer, "USER %s\r\n", username);
+    write(control_sock, buffer, strlen(buffer));
     memset(buffer, 0, sizeof(buffer));
     if (recv(control_sock, buffer, sizeof(buffer) - 1, 0) > 0) {
         printf("Servidor: %s", buffer);
     }
 
-    write(control_sock, "PASS anonymous\r\n", 17);
+    sprintf(buffer, "PASS %s\r\n", password);
+    write(control_sock, buffer, strlen(buffer));
     memset(buffer, 0, sizeof(buffer));
     if (recv(control_sock, buffer, sizeof(buffer) - 1, 0) > 0) {
         printf("Servidor: %s", buffer);
     }
-
-// Configurar modo passivo
-write(control_sock, "PASV\r\n", 6);
-memset(buffer, 0, sizeof(buffer));
-if (recv(control_sock, buffer, sizeof(buffer) - 1, 0) > 0) {
-    printf("Servidor: %s", buffer);
-}
-
-// Interpretar resposta PASV
-parse_pasv_response(buffer, ip, &port);
-printf("Conexão de dados em %s:%d\n", ip, port);
-
 
     // Configurar modo passivo
     write(control_sock, "PASV\r\n", 6);
-    read(control_sock, buffer, BUFFER_SIZE);
-    printf("Servidor: %s", buffer);
+    memset(buffer, 0, sizeof(buffer));
+    if (recv(control_sock, buffer, sizeof(buffer) - 1, 0) > 0) {
+        printf("Servidor: %s", buffer);
+    }
 
     // Interpretar resposta PASV
     parse_pasv_response(buffer, ip, &port);
@@ -92,12 +96,15 @@ printf("Conexão de dados em %s:%d\n", ip, port);
     }
 
     // Solicitar arquivo
-    write(control_sock, "RETR debian/README.html\r\n", 25);
-    read(control_sock, buffer, BUFFER_SIZE);
-    printf("Servidor: %s", buffer);
+    sprintf(buffer, "RETR %s\r\n", file_path);
+    write(control_sock, buffer, strlen(buffer));
+    memset(buffer, 0, sizeof(buffer));
+    if (recv(control_sock, buffer, sizeof(buffer) - 1, 0) > 0) {
+        printf("Servidor: %s", buffer);
+    }
 
     // Receber arquivo
-    FILE *file = fopen("README.html", "w");
+    FILE *file = fopen("downloaded_file", "w");
     if (!file)
         error("Erro ao criar arquivo local");
 
@@ -110,11 +117,12 @@ printf("Conexão de dados em %s:%d\n", ip, port);
 
     // Finalizar conexão de controle
     write(control_sock, "QUIT\r\n", 6);
-    read(control_sock, buffer, BUFFER_SIZE);
-    printf("Servidor: %s", buffer);
+    memset(buffer, 0, sizeof(buffer));
+    if (recv(control_sock, buffer, sizeof(buffer) - 1, 0) > 0) {
+        printf("Servidor: %s", buffer);
+    }
 
     close(control_sock);
     printf("Arquivo recebido e conexão encerrada.\n");
     return 0;
 }
-
