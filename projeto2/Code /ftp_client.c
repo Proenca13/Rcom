@@ -15,15 +15,24 @@ void error(const char *msg) {
 void parse_pasv_response(const char *response, char *ip, int *port) {
     int ip1, ip2, ip3, ip4, p1, p2;
 
-    // Extraindo os números da resposta PASV
-    sscanf(response, "227 Entering Passive Mode (%d,%d,%d,%d,%d,%d)", &ip1, &ip2, &ip3, &ip4, &p1, &p2);
+    // Tenta analisar a resposta com sscanf
+    if (sscanf(response, "227 Entering Passive Mode (%d,%d,%d,%d,%d,%d)",
+               &ip1, &ip2, &ip3, &ip4, &p1, &p2) != 6) {
+        fprintf(stderr, "Erro: Resposta PASV mal formatada: %s\n", response);
+        exit(EXIT_FAILURE);
+    }
 
-    // Construir o IP
+    // Montar o endereço IP no formato correto
     sprintf(ip, "%d.%d.%d.%d", ip1, ip2, ip3, ip4);
 
-    // Construir o número da porta
-    *port = p1 * 256 + p2;
+    // Calcular a porta da conexão de dados
+    *port = (p1 * 256) + p2;
+
+    // Debugging: Exibir os valores interpretados
+    printf("IP interpretado: %s\n", ip);
+    printf("Porta interpretada: %d\n", *port);
 }
+
 
 int main() {
     int control_sock, data_sock;
@@ -39,12 +48,6 @@ int main() {
     printf("Enter the file path on the server (e.g., /debian/README.html): ");
     scanf("%255s", file_path);
 
-    printf("Enter the username (or 'anonymous'): ");
-    scanf("%255s", username);
-
-    printf("Enter the password (or 'anonymous'): ");
-    scanf("%255s", password);
-
     // Resolver IP usando getip.c
     if (resolve_hostname_to_ip(ftp_server, ip) != 0) {
         error("Erro ao resolver hostname");
@@ -58,12 +61,27 @@ int main() {
     }
 
     // Receber mensagem de boas-vindas
-    memset(buffer, 0, sizeof(buffer)); 
-    if (recv(control_sock, buffer, sizeof(buffer) - 1, 0) > 0) {
+    memset(buffer, 0, sizeof(buffer));
+    while (1) {
+        if (recv(control_sock, buffer, sizeof(buffer) - 1, 0) <= 0) {
+            error("Erro ao receber mensagem do servidor");
+        }
+
         printf("Servidor: %s", buffer);
+
+        // Verifica se a mensagem contém o fim da sequência esperada
+        if (strstr(buffer, "220 ") != NULL) {
+            // Se encontramos um "220" no formato esperado, finalizamos o loop
+            break;
+        }
     }
 
     // Autenticação
+    printf("Enter the username (or 'anonymous'): ");
+    scanf("%255s", username);
+
+    printf("Enter the password (or 'anonymous'): ");
+    scanf("%255s", password);
     sprintf(buffer, "USER %s\r\n", username);
     write(control_sock, buffer, strlen(buffer));
     memset(buffer, 0, sizeof(buffer));
@@ -77,7 +95,9 @@ int main() {
     if (recv(control_sock, buffer, sizeof(buffer) - 1, 0) > 0) {
         printf("Servidor: %s", buffer);
     }
-
+    if (strstr(buffer, "230") == NULL) {
+        error("Erro na autenticação");
+    }
     // Configurar modo passivo
     write(control_sock, "PASV\r\n", 6);
     memset(buffer, 0, sizeof(buffer));
