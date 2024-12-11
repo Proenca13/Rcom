@@ -128,13 +128,19 @@ int main(int argc, char *argv[]) {
 
     sprintf(buffer, "PASS %s\r\n", password);
     write(control_sock, buffer, strlen(buffer));
+    
     memset(buffer, 0, sizeof(buffer));
-    if (recv(control_sock, buffer, sizeof(buffer) - 1, 0) > 0) {
-        printf("Servidor: %s", buffer);
-    }
+    while (1) {
+        if (recv(control_sock, buffer, sizeof(buffer) - 1, 0) <= 0) {
+            error("Erro ao receber mensagem do servidor");
+            break;
+        }
 
-    if (strstr(buffer, "230") == NULL) {
-        error("Erro na autenticação");
+        printf("Servidor: %s", buffer);
+
+        if (strstr(buffer, "230 ") != NULL) {
+            break;
+        }
     }
 
     // Configurar modo passivo
