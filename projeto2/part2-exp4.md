@@ -19,12 +19,12 @@ tux13:
 
 tux14:
 
-`route add 172.16.1.0/24 gw 172.16.11.254`
+`route add -net 172.16.1.0/24 gw 172.16.11.254`
 
 - RC -> `/ip route add dst-address=172.16.10.0/24 gateway=172.16.11.253`
 
 tux12:
-`route add 172.16.1.0/24 gw 172.16.11.254`
+`route add -net 172.16.1.0/24 gw 172.16.11.254`
 
 `route add -net 172.16.10.0/24 gw 172.16.11.253`
 
