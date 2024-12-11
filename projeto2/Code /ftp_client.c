@@ -12,6 +12,48 @@ void error(const char *msg) {
     exit(EXIT_FAILURE);
 }
 
+void parse_url(const char *url, char *username, char *password, char *hostname, char *filepath) {
+    // Check if URL starts with ftp://
+    if (strncmp(url, "ftp://", 6) != 0) {
+        error("URL must start with ftp://");
+    }
+
+    const char *cursor = url + 6; // Skip "ftp://"
+    const char *at = strchr(cursor, '@');
+    const char *slash = strchr(cursor, '/');
+
+    if (!slash) {
+        error("Invalid URL: Missing file path");
+    }
+
+    if (at && at < slash) {
+        // URL contains user:password@host
+        const char *colon = strchr(cursor, ':');
+        if (!colon || colon > at) {
+            error("Invalid URL: Missing password");
+        }
+
+        strncpy(username, cursor, colon - cursor);
+        username[colon - cursor] = '\0';
+
+        strncpy(password, colon + 1, at - colon - 1);
+        password[at - colon - 1] = '\0';
+
+        cursor = at + 1; // Move past user:password@
+    } else {
+        // No user:password provided, use anonymous
+        strcpy(username, "anonymous");
+        strcpy(password, "anonymous");
+    }
+
+    // Extract hostname
+    strncpy(hostname, cursor, slash - cursor);
+    hostname[slash - cursor] = '\0';
+
+    // Extract file path
+    strcpy(filepath, slash);
+}
+
 void parse_pasv_response(const char *response, char *ip, int *port) {
     int ip1, ip2, ip3, ip4, p1, p2;
 
@@ -33,23 +75,25 @@ void parse_pasv_response(const char *response, char *ip, int *port) {
     printf("Porta interpretada: %d\n", *port);
 }
 
+int main(int argc, char *argv[]) {
+    if (argc != 2) {
+        fprintf(stderr, "Uso: %s <ftp-url>\n", argv[0]);
+        exit(EXIT_FAILURE);
+    }
 
-int main() {
+    const char *url = argv[1];
     int control_sock, data_sock;
     char buffer[BUFFER_SIZE];
     char ip[16];
     int port;
-    char ftp_server[256], file_path[256], username[256], password[256];
+    char username[256] = {0}, password[256] = {0}, hostname[256] = {0}, filepath[256] = {0};
 
-    // Pedir ao usuário as informações
-    printf("Enter the FTP server URL (e.g., mirrors.up.pt): ");
-    scanf("%255s", ftp_server);
-
-    printf("Enter the file path on the server (e.g., /debian/README.html): ");
-    scanf("%255s", file_path);
+    // Parsear o URL
+    parse_url(url, username, password, hostname, filepath);
+    printf("Username: %s\nPassword: %s\nHostname: %s\nFilepath: %s\n", username, password, hostname, filepath);
 
     // Resolver IP usando getip.c
-    if (resolve_hostname_to_ip(ftp_server, ip) != 0) {
+    if (resolve_hostname_to_ip(hostname, ip) != 0) {
         error("Erro ao resolver hostname");
     }
     printf("IP do servidor FTP: %s\n", ip);
@@ -69,19 +113,12 @@ int main() {
 
         printf("Servidor: %s", buffer);
 
-        // Verifica se a mensagem contém o fim da sequência esperada
         if (strstr(buffer, "220 ") != NULL) {
-            // Se encontramos um "220" no formato esperado, finalizamos o loop
             break;
         }
     }
 
     // Autenticação
-    printf("Enter the username (or 'anonymous'): ");
-    scanf("%255s", username);
-
-    printf("Enter the password (or 'anonymous'): ");
-    scanf("%255s", password);
     sprintf(buffer, "USER %s\r\n", username);
     write(control_sock, buffer, strlen(buffer));
     memset(buffer, 0, sizeof(buffer));
@@ -95,9 +132,11 @@ int main() {
     if (recv(control_sock, buffer, sizeof(buffer) - 1, 0) > 0) {
         printf("Servidor: %s", buffer);
     }
+
     if (strstr(buffer, "230") == NULL) {
         error("Erro na autenticação");
     }
+
     // Configurar modo passivo
     write(control_sock, "PASV\r\n", 6);
     memset(buffer, 0, sizeof(buffer));
@@ -116,7 +155,7 @@ int main() {
     }
 
     // Solicitar arquivo
-    sprintf(buffer, "RETR %s\r\n", file_path);
+    sprintf(buffer, "RETR %s\r\n", filepath);
     write(control_sock, buffer, strlen(buffer));
     memset(buffer, 0, sizeof(buffer));
     if (recv(control_sock, buffer, sizeof(buffer) - 1, 0) > 0) {
@@ -125,8 +164,9 @@ int main() {
 
     // Receber arquivo
     FILE *file = fopen("downloaded_file", "w");
-    if (!file)
+    if (!file) {
         error("Erro ao criar arquivo local");
+    }
 
     int bytes_read;
     while ((bytes_read = read(data_sock, buffer, BUFFER_SIZE)) > 0) {
