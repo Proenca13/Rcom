@@ -19,7 +19,7 @@ int connect_to_server(int socket, const char *ip, int port) {
     memset(&server_addr, 0, sizeof(server_addr));
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(port);
-
+    //inet_pton passa o endereço ip para linguagem máquina
     if (inet_pton(AF_INET, ip, &server_addr.sin_addr) <= 0) {
         perror("Erro ao converter IP");
         return -1;

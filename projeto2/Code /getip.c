@@ -8,13 +8,11 @@ int resolve_hostname_to_ip(const char *hostname, char *ip) {
     struct in_addr **addr_list;
 
     if ((he = gethostbyname(hostname)) == NULL) {
-        // Não foi possível resolver o hostname
         return -1;
     }
 
     addr_list = (struct in_addr **)he->h_addr_list;
 
-    // Copiar o primeiro endereço IP na string ip
     if (addr_list[0] != NULL) {
         strcpy(ip, inet_ntoa(*addr_list[0]));
         return 0;

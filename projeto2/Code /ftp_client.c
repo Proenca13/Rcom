@@ -2,8 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include "getip.c"       // Funções do ficheiro getip.c
-#include "clientTCP.c"   // Funções do ficheiro clientTCP.c
+#include "getip.c"       
+#include "clientTCP.c"   
 
 #define BUFFER_SIZE 1024
 
@@ -13,7 +13,6 @@ void error(const char *msg) {
 }
 
 void parse_url(const char *url, char *username, char *password, char *hostname, char *filepath) {
-    // Check if URL starts with ftp://
     if (strncmp(url, "ftp://", 6) != 0) {
         error("URL must start with ftp://");
     }
@@ -57,22 +56,17 @@ void parse_url(const char *url, char *username, char *password, char *hostname, 
 void parse_pasv_response(const char *response, char *ip, int *port) {
     int ip1, ip2, ip3, ip4, p1, p2;
 
-    // Tenta analisar a resposta com sscanf
     if (sscanf(response, "227 Entering Passive Mode (%d,%d,%d,%d,%d,%d)",
                &ip1, &ip2, &ip3, &ip4, &p1, &p2) != 6) {
         fprintf(stderr, "Erro: Resposta PASV mal formatada: %s\n", response);
         exit(EXIT_FAILURE);
     }
 
-    // Montar o endereço IP no formato correto
     sprintf(ip, "%d.%d.%d.%d", ip1, ip2, ip3, ip4);
 
-    // Calcular a porta da conexão de dados
     *port = (p1 * 256) + p2;
 
-    // Debugging: Exibir os valores interpretados
-    printf("IP interpretado: %s\n", ip);
-    printf("Porta interpretada: %d\n", *port);
+   
 }
 
 int main(int argc, char *argv[]) {
@@ -88,23 +82,21 @@ int main(int argc, char *argv[]) {
     int port;
     char username[256] = {0}, password[256] = {0}, hostname[256] = {0}, filepath[256] = {0};
 
-    // Parsear o URL
     parse_url(url, username, password, hostname, filepath);
     printf("Username: %s\nPassword: %s\nHostname: %s\nFilepath: %s\n", username, password, hostname, filepath);
 
-    // Resolver IP usando getip.c
     if (resolve_hostname_to_ip(hostname, ip) != 0) {
         error("Erro ao resolver hostname");
     }
     printf("IP do servidor FTP: %s\n", ip);
 
-    // Criar e conectar socket de controle usando clientTCP.c
+    // Criar e conectar control socket
     control_sock = create_socket();
     if (connect_to_server(control_sock, ip, 21) != 0) {
         error("Erro ao conectar ao servidor FTP");
     }
 
-    // Receber mensagem de boas-vindas
+    // Ler todas as mensagens 220
     memset(buffer, 0, sizeof(buffer));
     while (1) {
         if (recv(control_sock, buffer, sizeof(buffer) - 1, 0) <= 0) {
@@ -128,7 +120,7 @@ int main(int argc, char *argv[]) {
 
     sprintf(buffer, "PASS %s\r\n", password);
     write(control_sock, buffer, strlen(buffer));
-    
+    //ler todas as respostas 230
     memset(buffer, 0, sizeof(buffer));
     while (1) {
         if (recv(control_sock, buffer, sizeof(buffer) - 1, 0) <= 0) {
@@ -150,17 +142,15 @@ int main(int argc, char *argv[]) {
         printf("Servidor: %s", buffer);
     }
 
-    // Interpretar resposta PASV
     parse_pasv_response(buffer, ip, &port);
     printf("Conexão de dados em %s:%d\n", ip, port);
 
-    // Criar e conectar socket de dados usando clientTCP.c
+    // Criar e conectar data socket 
     data_sock = create_socket();
     if (connect_to_server(data_sock, ip, port) != 0) {
         error("Erro ao conectar ao socket de dados");
     }
 
-    // Solicitar arquivo
     sprintf(buffer, "RETR %s\r\n", filepath);
     write(control_sock, buffer, strlen(buffer));
     memset(buffer, 0, sizeof(buffer));
@@ -168,7 +158,6 @@ int main(int argc, char *argv[]) {
         printf("Servidor: %s", buffer);
     }
 
-    // Receber arquivo
     FILE *file = fopen("downloaded_file", "w");
     if (!file) {
         error("Erro ao criar arquivo local");
@@ -181,7 +170,6 @@ int main(int argc, char *argv[]) {
     fclose(file);
     close(data_sock);
 
-    // Finalizar conexão de controle
     write(control_sock, "QUIT\r\n", 6);
     memset(buffer, 0, sizeof(buffer));
     if (recv(control_sock, buffer, sizeof(buffer) - 1, 0) > 0) {
