@@ -157,8 +157,14 @@ int main(int argc, char *argv[]) {
     if (recv(control_sock, buffer, sizeof(buffer) - 1, 0) > 0) {
         printf("Servidor: %s", buffer);
     }
+    const char *filename = strrchr(filepath, '/');
+    if (filename) {
+        filename++; 
+    } else {
+        filename = filepath; 
+    }
 
-    FILE *file = fopen("downloaded_file", "w");
+    FILE *file = fopen(filename, "w");
     if (!file) {
         error("Erro ao criar arquivo local");
     }
